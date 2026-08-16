@@ -741,14 +741,22 @@ export function createApp(options = {}) {
     const requestUrl = new URL(request.url || "/", "http://localhost");
     const pathname = safePathname(requestUrl.pathname);
 
-    if (!pathname) return sendError(response, 400, "Invalid request path.");
-
 if (pathname === "/video-stream") {
+  console.log("[video] ROUTE HIT", request.method, pathname);
+
   if (request.method !== "GET" && request.method !== "HEAD") {
     return sendError(response, 405, "Method not allowed.");
   }
 
   const bucketConfig = getBucketConfig();
+
+  console.log("[video] bucket config:", {
+    bucket: Boolean(bucketConfig.bucket),
+    endpoint: Boolean(bucketConfig.endpoint),
+    region: bucketConfig.region,
+    accessKeyId: Boolean(bucketConfig.accessKeyId),
+    secretAccessKey: Boolean(bucketConfig.secretAccessKey),
+  });
 
   if (
     !bucketConfig.bucket ||
@@ -756,16 +764,29 @@ if (pathname === "/video-stream") {
     !bucketConfig.accessKeyId ||
     !bucketConfig.secretAccessKey
   ) {
-    console.error("[video] Railway bucket environment variables are missing.");
-
-    return sendError(
-      response,
-      503,
-      "Video service is not configured."
-    );
+    return sendError(response, 503, "Video service is not configured.");
   }
 
-  // ...more code below this...
+  try {
+    const videoKey = await getVideoFromBucket(bucketConfig);
+
+    console.log("[video] selected key:", videoKey);
+
+    if (!videoKey) {
+      return sendError(response, 404, "No video available in the bucket.");
+    }
+
+    return streamVideoFromBucket(
+      bucketConfig,
+      videoKey,
+      request,
+      response
+    );
+  } catch (error) {
+    console.error("[video] ROUTE ERROR:", error);
+
+    return sendError(response, 502, "Video service error.");
+  }
 }
 
     try {
