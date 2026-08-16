@@ -320,7 +320,7 @@ function renderHome() {
 
 function renderVideo() {
   app.innerHTML = `
-    <section class="page">
+    <section class="page video-page">
       <div class="page-hero reveal">
         <span class="eyebrow">Fact-Check video</span>
         <h1>Watch the video.</h1>
@@ -328,13 +328,13 @@ function renderVideo() {
       </div>
 
       <section class="page">
-        <div class="glass-card reveal" style="padding:0; overflow:hidden;">
+        <div class="video-card glass-card reveal">
           <video
+            class="video-player"
             src="/video"
             controls
             playsinline
             preload="metadata"
-            style="display:block; width:100%; height:auto; background:#000;"
           >
             Your browser does not support HTML5 video.
           </video>
