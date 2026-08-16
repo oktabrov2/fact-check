@@ -24,79 +24,125 @@ const MIME_TYPES = {
   ".ico": "image/x-icon",
 };
 
-const VIDEO_PROXY_TARGET = "https://video-redirect-production.up.railway.app";
-const VIDEO_PROXY_TIMEOUT_MS = 20_000;
-const VIDEO_PROXY_HOP_BY_HOP_HEADERS = new Set([
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-  "host",
-  "content-length",
-]);
-
-function forwardableRequestHeaders(headers) {
-  const forwarded = {};
-  for (const [key, value] of Object.entries(headers || {})) {
-    if (value === undefined) continue;
-    if (VIDEO_PROXY_HOP_BY_HOP_HEADERS.has(key.toLowerCase())) continue;
-    forwarded[key] = value;
-  }
-  return forwarded;
+// Video bucket configuration
+function getBucketConfig() {
+  return {
+    bucket: process.env.BUCKET || null,
+    region: process.env.REGION || null,
+    endpoint: process.env.ENDPOINT || null,
+    accessKeyId: process.env.ACCESS_KEY_ID || null,
+    secretAccessKey: process.env.SECRET_ACCESS_KEY || null,
+  };
 }
 
-function forwardableResponseHeaders(headers) {
-  const forwarded = {};
-  for (const [key, value] of headers.entries()) {
-    if (VIDEO_PROXY_HOP_BY_HOP_HEADERS.has(key.toLowerCase())) continue;
-    forwarded[key] = value;
-  }
-  return forwarded;
+function getVideoContentType(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  const types = {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".webm": "video/webm",
+    ".mkv": "video/x-matroska",
+    ".avi": "video/x-msvideo",
+    ".m4v": "video/x-m4v",
+    ".flv": "video/x-flv",
+    ".mpg": "video/mpeg",
+    ".mpeg": "video/mpeg",
+    ".3gp": "video/3gpp",
+    ".m3u8": "video/mp2t",
+    ".ts": "video/mp2t",
+  };
+  return types[ext] || "application/octet-stream";
 }
 
-async function proxyVideoRequest(request, response, requestUrl) {
-  const targetUrl = new URL(requestUrl.pathname + requestUrl.search, VIDEO_PROXY_TARGET);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), VIDEO_PROXY_TIMEOUT_MS);
+function isVideoFile(key) {
+  const videoExtensions = /\.(mp4|mov|webm|mkv|avi|m4v|flv|mpg|mpeg|3gp|m3u8|ts)$/i;
+  return videoExtensions.test(key);
+}
+
+async function getVideoFromBucket(bucketConfig) {
+  if (!bucketConfig.bucket || !bucketConfig.endpoint) {
+    return null;
+  }
+
   try {
-    const hasBody = request.method !== "GET" && request.method !== "HEAD";
-    const upstream = await fetch(targetUrl, {
-      method: request.method,
-      headers: forwardableRequestHeaders(request.headers),
-      body: hasBody ? Readable.toWeb(request) : undefined,
-      duplex: hasBody ? "half" : undefined,
-      signal: controller.signal,
-      redirect: "follow",
+    const bucketUrl = new URL(bucketConfig.endpoint);
+    bucketUrl.pathname = `/${bucketConfig.bucket}`;
+    
+    const headers = {
+      "Authorization": `AWS4-HMAC-SHA256 Credential=${bucketConfig.accessKeyId}`,
+    };
+
+    // Construct S3 ListObjects request
+    const listUrl = new URL(`${bucketUrl}?list-type=2&max-keys=1000`);
+    const response = await fetch(listUrl.toString(), {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => null);
+
+    if (!response || !response.ok) return null;
+
+    const text = await response.text();
+    
+    // Parse XML response to find first video
+    const keyMatches = text.match(/<Key>([^<]+)<\/Key>/g);
+    if (!keyMatches) return null;
+
+    for (const match of keyMatches) {
+      const key = match.replace(/<\/?Key>/g, "");
+      if (isVideoFile(key)) {
+        return key;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function streamVideoFromBucket(bucketConfig, videoKey, response) {
+  try {
+    const bucketUrl = new URL(bucketConfig.endpoint);
+    bucketUrl.pathname = `/${bucketConfig.bucket}/${encodeURIComponent(videoKey)}`;
+
+    const videoResponse = await fetch(bucketUrl.toString(), {
+      method: "GET",
+      signal: AbortSignal.timeout(30_000),
     });
 
-    response.writeHead(upstream.status, forwardableResponseHeaders(upstream.headers));
-
-    if (request.method === "HEAD" || !upstream.body) {
-      response.end();
-      return;
+    if (!videoResponse.ok) {
+      return sendError(response, 502, "Could not fetch video from storage.");
     }
 
-    const nodeStream = Readable.fromWeb(upstream.body);
+    const contentType = getVideoContentType(videoKey);
+    const contentLength = videoResponse.headers.get("content-length");
+    const headers = {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=86400",
+      "Accept-Ranges": "bytes",
+    };
+
+    if (contentLength) {
+      headers["Content-Length"] = contentLength;
+    }
+
+    response.writeHead(200, headers);
+
+    const nodeStream = Readable.fromWeb(videoResponse.body);
     nodeStream.on("error", () => {
-      if (!response.headersSent) sendError(response, 502, "The video service returned an invalid response.");
-      else response.destroy();
+      if (!response.headersSent) {
+        sendError(response, 502, "Video stream failed.");
+      } else {
+        response.destroy();
+      }
     });
     nodeStream.pipe(response);
   } catch (error) {
-    const timedOut = error instanceof Error && error.name === "AbortError";
     if (!response.headersSent) {
-      sendError(response, timedOut ? 504 : 502, timedOut
-        ? "The video service took too long to respond."
-        : "The video service is currently unavailable.");
+      sendError(response, 502, "Could not stream video.");
     } else {
       response.destroy();
     }
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -434,8 +480,21 @@ export function createApp(options = {}) {
     if (!pathname) return sendError(response, 400, "Invalid request path.");
 
     if (pathname === "/video" || pathname.startsWith("/video/")) {
-      return proxyVideoRequest(request, response, requestUrl);
+  const bucketConfig = getBucketConfig();
+  if (!bucketConfig.bucket) {
+    return sendError(response, 503, "Video service is not configured.");
+  }
+  
+  try {
+    const videoKey = await getVideoFromBucket(bucketConfig);
+    if (!videoKey) {
+      return sendError(response, 404, "No video available.");
     }
+    return streamVideoFromBucket(bucketConfig, videoKey, response);
+  } catch (error) {
+    return sendError(response, 502, "Video service error.");
+  }
+}
 
     try {
       if (pathname === "/api/health" && (request.method === "GET" || request.method === "HEAD")) {
