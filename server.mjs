@@ -59,24 +59,25 @@ function isVideoFile(key) {
   return videoExtensions.test(key);
 }
 
+// Use basic HTTP auth with S3-compatible endpoint
 async function getVideoFromBucket(bucketConfig) {
-  if (!bucketConfig.bucket || !bucketConfig.endpoint) {
+  if (!bucketConfig.bucket || !bucketConfig.endpoint || !bucketConfig.accessKeyId || !bucketConfig.secretAccessKey) {
     return null;
   }
 
   try {
     const bucketUrl = new URL(bucketConfig.endpoint);
     bucketUrl.pathname = `/${bucketConfig.bucket}`;
-    
-    const headers = {
-      "Authorization": `AWS4-HMAC-SHA256 Credential=${bucketConfig.accessKeyId}`,
-    };
+    const listUrl = `${bucketUrl.toString()}?list-type=2&max-keys=100`;
 
-    // Construct S3 ListObjects request
-    const listUrl = new URL(`${bucketUrl}?list-type=2&max-keys=1000`);
-    const response = await fetch(listUrl.toString(), {
+    // Use basic auth with S3 credentials
+    const auth = Buffer.from(`${bucketConfig.accessKeyId}:${bucketConfig.secretAccessKey}`).toString('base64');
+    
+    const response = await fetch(listUrl, {
       method: "GET",
-      headers,
+      headers: {
+        "Authorization": `Basic ${auth}`,
+      },
       signal: AbortSignal.timeout(10_000),
     }).catch(() => null);
 
@@ -84,7 +85,7 @@ async function getVideoFromBucket(bucketConfig) {
 
     const text = await response.text();
     
-    // Parse XML response to find first video
+    // Parse XML to find first video file
     const keyMatches = text.match(/<Key>([^<]+)<\/Key>/g);
     if (!keyMatches) return null;
 
@@ -95,7 +96,8 @@ async function getVideoFromBucket(bucketConfig) {
       }
     }
     return null;
-  } catch {
+  } catch (error) {
+    console.error("Error listing bucket videos:", error);
     return null;
   }
 }
@@ -105,8 +107,13 @@ async function streamVideoFromBucket(bucketConfig, videoKey, response) {
     const bucketUrl = new URL(bucketConfig.endpoint);
     bucketUrl.pathname = `/${bucketConfig.bucket}/${encodeURIComponent(videoKey)}`;
 
+    const auth = Buffer.from(`${bucketConfig.accessKeyId}:${bucketConfig.secretAccessKey}`).toString('base64');
+
     const videoResponse = await fetch(bucketUrl.toString(), {
       method: "GET",
+      headers: {
+        "Authorization": `Basic ${auth}`,
+      },
       signal: AbortSignal.timeout(30_000),
     });
 
@@ -138,6 +145,7 @@ async function streamVideoFromBucket(bucketConfig, videoKey, response) {
     });
     nodeStream.pipe(response);
   } catch (error) {
+    console.error("Error streaming video:", error);
     if (!response.headersSent) {
       sendError(response, 502, "Could not stream video.");
     } else {
