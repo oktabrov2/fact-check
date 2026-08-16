@@ -322,100 +322,72 @@ async function getVideoFromBucket(bucketConfig) {
 
 async function streamVideoFromBucket(bucketConfig, videoKey, request, response) {
   try {
-    const range = request.headers.range;
+    const headers = {};
 
-    const requestHeaders = {};
-
-    if (range) {
-      requestHeaders.range = range;
+    // Pass the browser's Range header to S3.
+    // This is essential for HTML5 video streaming/seeking.
+    if (request.headers.range) {
+      headers.Range = request.headers.range;
     }
-
-    const method = request.method === "HEAD" ? "HEAD" : "GET";
 
     const videoResponse = await s3Request(bucketConfig, {
-      method,
+      method: "GET",
       key: videoKey,
-      headers: requestHeaders,
+      headers,
     });
 
-    console.log(
-      `[video] ${method} ${videoKey}:`,
-      videoResponse.status,
-      videoResponse.statusText,
-      range ? `(range ${range})` : ""
-    );
-
     if (!videoResponse.ok && videoResponse.status !== 206) {
-      const errorText = await videoResponse.text().catch(() => "");
-
       console.error(
-        "[video] Object request failed:",
+        "[video] S3 GetObject failed:",
         videoResponse.status,
-        errorText.slice(0, 500)
+        await videoResponse.text().catch(() => "")
       );
 
-      return sendError(
-        response,
-        502,
-        "Could not fetch video from storage."
-      );
+      return sendError(response, 502, "Could not fetch video from storage.");
     }
 
-    const headers = {
+    const responseHeaders = {
+      // Tell the browser this is a video, not a downloadable attachment.
       "Content-Type":
         videoResponse.headers.get("content-type") ||
         getVideoContentType(videoKey),
 
-      "Cache-Control": "no-cache",
+      // Explicitly allow byte-range video playback.
+      "Accept-Ranges": "bytes",
 
-      "Accept-Ranges":
-        videoResponse.headers.get("accept-ranges") || "bytes",
+      // Do NOT set Content-Disposition: attachment.
+      "Cache-Control": "no-cache",
     };
 
-    const contentLength =
-      videoResponse.headers.get("content-length");
-
-    const contentRange =
-      videoResponse.headers.get("content-range");
-
-    const etag =
-      videoResponse.headers.get("etag");
-
-    const lastModified =
-      videoResponse.headers.get("last-modified");
+    const contentLength = videoResponse.headers.get("content-length");
+    const contentRange = videoResponse.headers.get("content-range");
+    const etag = videoResponse.headers.get("etag");
 
     if (contentLength) {
-      headers["Content-Length"] = contentLength;
+      responseHeaders["Content-Length"] = contentLength;
     }
 
     if (contentRange) {
-      headers["Content-Range"] = contentRange;
+      responseHeaders["Content-Range"] = contentRange;
     }
 
     if (etag) {
-      headers.ETag = etag;
+      responseHeaders.ETag = etag;
     }
 
-    if (lastModified) {
-      headers["Last-Modified"] = lastModified;
-    }
-
-    const status =
-      videoResponse.status === 206 ? 206 : 200;
-
-    response.writeHead(status, headers);
-
-    if (request.method === "HEAD") {
-      return response.end();
-    }
+    // S3 returns 206 when the browser requested a byte range.
+    response.writeHead(
+      videoResponse.status === 206 ? 206 : 200,
+      responseHeaders
+    );
 
     if (!videoResponse.body) {
       return response.end();
     }
 
-    const nodeStream = Readable.fromWeb(videoResponse.body);
+    const stream = Readable.fromWeb(videoResponse.body);
 
-    nodeStream.on("error", (error) => {
+    stream.on("error", (error) => {
       console.error("[video] Stream error:", error);
 
       if (!response.headersSent) {
@@ -425,7 +397,8 @@ async function streamVideoFromBucket(bucketConfig, videoKey, request, response) 
       }
     });
 
-    nodeStream.pipe(response);
+    // IMPORTANT: this streams directly to the browser.
+    stream.pipe(response);
   } catch (error) {
     console.error("[video] Error streaming video:", error);
 
@@ -770,7 +743,7 @@ export function createApp(options = {}) {
 
     if (!pathname) return sendError(response, 400, "Invalid request path.");
 
-    if (pathname === "/video") {
+if (pathname === "/video") {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return sendError(response, 405, "Method not allowed.");
   }
@@ -792,34 +765,7 @@ export function createApp(options = {}) {
     );
   }
 
-  try {
-    const videoKey = await getVideoFromBucket(bucketConfig);
-
-    if (!videoKey) {
-      return sendError(
-        response,
-        404,
-        "No video available in the bucket."
-      );
-    }
-
-    console.log("[video] Serving:", videoKey);
-
-    return streamVideoFromBucket(
-      bucketConfig,
-      videoKey,
-      request,
-      response
-    );
-  } catch (error) {
-    console.error("[video] Route error:", error);
-
-    return sendError(
-      response,
-      502,
-      "Video service error."
-    );
-  }
+  // ...more code below this...
 }
 
     try {
