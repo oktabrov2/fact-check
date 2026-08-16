@@ -61,7 +61,16 @@ function isVideoFile(key) {
 
 // Use basic HTTP auth with S3-compatible endpoint
 async function getVideoFromBucket(bucketConfig) {
+  console.log("[getVideoFromBucket] bucket config check:", {
+    bucket: bucketConfig.bucket ? "present" : "MISSING",
+    region: bucketConfig.region ? "present" : "MISSING",
+    endpoint: bucketConfig.endpoint ? "present" : "MISSING",
+    accessKeyId: bucketConfig.accessKeyId ? "present" : "MISSING",
+    secretAccessKey: bucketConfig.secretAccessKey ? "present" : "MISSING",
+  });
+
   if (!bucketConfig.bucket || !bucketConfig.endpoint || !bucketConfig.accessKeyId || !bucketConfig.secretAccessKey) {
+    console.log("[getVideoFromBucket] Missing required bucket config, aborting.");
     return null;
   }
 
@@ -69,6 +78,9 @@ async function getVideoFromBucket(bucketConfig) {
     const bucketUrl = new URL(bucketConfig.endpoint);
     bucketUrl.pathname = `/${bucketConfig.bucket}`;
     const listUrl = `${bucketUrl.toString()}?list-type=2&max-keys=100`;
+
+    console.log("[getVideoFromBucket] bucketUrl:", bucketUrl.toString());
+    console.log("[getVideoFromBucket] listUrl:", listUrl);
 
     // Use basic auth with S3 credentials
     const auth = Buffer.from(`${bucketConfig.accessKeyId}:${bucketConfig.secretAccessKey}`).toString('base64');
@@ -79,22 +91,46 @@ async function getVideoFromBucket(bucketConfig) {
         "Authorization": `Basic ${auth}`,
       },
       signal: AbortSignal.timeout(10_000),
-    }).catch(() => null);
+    }).catch((err) => {
+      console.log("[getVideoFromBucket] fetch threw an error:", err);
+      return null;
+    });
 
-    if (!response || !response.ok) return null;
+    if (!response) {
+      console.log("[getVideoFromBucket] No response received from fetch (request failed or timed out).");
+      return null;
+    }
+
+    console.log("[getVideoFromBucket] response status:", response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "<unable to read body>");
+      console.log("[getVideoFromBucket] response not OK. Body (first 500 chars):", errorText.slice(0, 500));
+      return null;
+    }
 
     const text = await response.text();
+    console.log("[getVideoFromBucket] response body (first 500 chars):", text.slice(0, 500));
     
     // Parse XML to find first video file
     const keyMatches = text.match(/<Key>([^<]+)<\/Key>/g);
-    if (!keyMatches) return null;
+    console.log("[getVideoFromBucket] number of XML keys found:", keyMatches ? keyMatches.length : 0);
+
+    if (!keyMatches) {
+      console.log("[getVideoFromBucket] No <Key> entries found in response, bucket may be empty.");
+      return null;
+    }
 
     for (const match of keyMatches) {
       const key = match.replace(/<\/?Key>/g, "");
-      if (isVideoFile(key)) {
+      const matches = isVideoFile(key);
+      console.log(`[getVideoFromBucket] checking key "${key}" - matches video regex: ${matches}`);
+      if (matches) {
+        console.log(`[getVideoFromBucket] Found video file: "${key}"`);
         return key;
       }
     }
+    console.log("[getVideoFromBucket] No keys matched the video file regex. No video found.");
     return null;
   } catch (error) {
     console.error("Error listing bucket videos:", error);
