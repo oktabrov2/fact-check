@@ -318,6 +318,34 @@ function renderHome() {
   hydrateRegistryOverview();
 }
 
+function renderVideo() {
+  app.innerHTML = `
+    <section class="page">
+      <div class="page-hero reveal">
+        <span class="eyebrow">Fact-Check video</span>
+        <h1>Watch the video.</h1>
+        <p class="lead">Streaming from the Fact-Check video service.</p>
+      </div>
+
+      <section class="page">
+        <div class="glass-card reveal" style="padding:0; overflow:hidden;">
+          <video
+            src="/video"
+            controls
+            playsinline
+            preload="metadata"
+            style="display:block; width:100%; height:auto; background:#000;"
+          >
+            Your browser does not support HTML5 video.
+          </video>
+        </div>
+      </section>
+    </section>
+  `;
+
+  observeReveals();
+}
+
 function renderCheck() {
   app.innerHTML = `${pageHead("Evidence workspace", "Verify a claim. <em>Trace the evidence.</em>", "Fact-Check first identifies the relevant source categories, then runs a separate evidence search only inside those approved domains. The final answer stays short and linked.")}
     <section class="page checker-layout">
