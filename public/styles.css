@@ -21,6 +21,18 @@
   color-scheme: dark;
 }
 
+.video-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.video-player {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #000;
+}
+
 * { box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
