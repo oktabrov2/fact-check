@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { bootstrapEnvironmentAdministrator, createAuth, createUserAuth } from "./lib/auth.mjs";
 import { categoryForKey, categoryLabel, categorySummary, isBlockedPlatformDomain, SOURCE_CATEGORIES } from "./lib/categories.mjs";
@@ -22,6 +23,82 @@ const MIME_TYPES = {
   ".webp": "image/webp",
   ".ico": "image/x-icon",
 };
+
+const VIDEO_PROXY_TARGET = "https://video-redirect-production.up.railway.app";
+const VIDEO_PROXY_TIMEOUT_MS = 20_000;
+const VIDEO_PROXY_HOP_BY_HOP_HEADERS = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+  "host",
+  "content-length",
+]);
+
+function forwardableRequestHeaders(headers) {
+  const forwarded = {};
+  for (const [key, value] of Object.entries(headers || {})) {
+    if (value === undefined) continue;
+    if (VIDEO_PROXY_HOP_BY_HOP_HEADERS.has(key.toLowerCase())) continue;
+    forwarded[key] = value;
+  }
+  return forwarded;
+}
+
+function forwardableResponseHeaders(headers) {
+  const forwarded = {};
+  for (const [key, value] of headers.entries()) {
+    if (VIDEO_PROXY_HOP_BY_HOP_HEADERS.has(key.toLowerCase())) continue;
+    forwarded[key] = value;
+  }
+  return forwarded;
+}
+
+async function proxyVideoRequest(request, response, requestUrl) {
+  const targetUrl = new URL(requestUrl.pathname + requestUrl.search, VIDEO_PROXY_TARGET);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), VIDEO_PROXY_TIMEOUT_MS);
+  try {
+    const hasBody = request.method !== "GET" && request.method !== "HEAD";
+    const upstream = await fetch(targetUrl, {
+      method: request.method,
+      headers: forwardableRequestHeaders(request.headers),
+      body: hasBody ? Readable.toWeb(request) : undefined,
+      duplex: hasBody ? "half" : undefined,
+      signal: controller.signal,
+      redirect: "follow",
+    });
+
+    response.writeHead(upstream.status, forwardableResponseHeaders(upstream.headers));
+
+    if (request.method === "HEAD" || !upstream.body) {
+      response.end();
+      return;
+    }
+
+    const nodeStream = Readable.fromWeb(upstream.body);
+    nodeStream.on("error", () => {
+      if (!response.headersSent) sendError(response, 502, "The video service returned an invalid response.");
+      else response.destroy();
+    });
+    nodeStream.pipe(response);
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "AbortError";
+    if (!response.headersSent) {
+      sendError(response, timedOut ? 504 : 502, timedOut
+        ? "The video service took too long to respond."
+        : "The video service is currently unavailable.");
+    } else {
+      response.destroy();
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 const REVIEWED_USAGE_STATUSES = new Set([
   "reviewed-link-and-citation",
@@ -355,6 +432,10 @@ export function createApp(options = {}) {
     const pathname = safePathname(requestUrl.pathname);
 
     if (!pathname) return sendError(response, 400, "Invalid request path.");
+
+    if (pathname === "/video" || pathname.startsWith("/video/")) {
+      return proxyVideoRequest(request, response, requestUrl);
+    }
 
     try {
       if (pathname === "/api/health" && (request.method === "GET" || request.method === "HEAD")) {
