@@ -74,6 +74,7 @@ function titleFor(pathname) {
     "/account": "Your profile — Fact-Check",
     "/donate": "Support Fact-Check",
     "/admin": "Fact-Check Admin",
+    "/video": "Video — Fact-Check",
   };
   return titles[pathname] || "Fact-Check";
 }
