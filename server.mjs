@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import crypto from "node:crypto";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { bootstrapEnvironmentAdministrator, createAuth, createUserAuth } from "./lib/auth.mjs";
@@ -24,19 +25,28 @@ const MIME_TYPES = {
   ".ico": "image/x-icon",
 };
 
-// Video bucket configuration
+// -----------------------------------------------------------------------------
+// Railway S3-compatible video bucket
+// -----------------------------------------------------------------------------
+
 function getBucketConfig() {
   return {
     bucket: process.env.BUCKET || null,
-    region: process.env.REGION || null,
-    endpoint: process.env.ENDPOINT || null,
+    region: process.env.REGION || "auto",
+    endpoint: process.env.ENDPOINT || "https://storage.railway.app",
     accessKeyId: process.env.ACCESS_KEY_ID || null,
     secretAccessKey: process.env.SECRET_ACCESS_KEY || null,
+
+    // Railway says current buckets use virtual-hosted style.
+    // Set S3_FORCE_PATH_STYLE=true only if the bucket's Credentials tab
+    // specifically says that it requires path-style URLs.
+    forcePathStyle: String(process.env.S3_FORCE_PATH_STYLE || "").toLowerCase() === "true",
   };
 }
 
 function getVideoContentType(filename) {
   const ext = path.extname(filename).toLowerCase();
+
   const types = {
     ".mp4": "video/mp4",
     ".mov": "video/quicktime",
@@ -48,140 +58,377 @@ function getVideoContentType(filename) {
     ".mpg": "video/mpeg",
     ".mpeg": "video/mpeg",
     ".3gp": "video/3gpp",
-    ".m3u8": "video/mp2t",
+    ".m3u8": "application/vnd.apple.mpegurl",
     ".ts": "video/mp2t",
   };
+
   return types[ext] || "application/octet-stream";
 }
 
 function isVideoFile(key) {
-  const videoExtensions = /\.(mp4|mov|webm|mkv|avi|m4v|flv|mpg|mpeg|3gp|m3u8|ts)$/i;
-  return videoExtensions.test(key);
+  return /\.(mp4|mov|webm|mkv|avi|m4v|flv|mpg|mpeg|3gp|m3u8|ts)$/i.test(key);
 }
 
-// Use basic HTTP auth with S3-compatible endpoint
-async function getVideoFromBucket(bucketConfig) {
-  console.log("[getVideoFromBucket] bucket config check:", {
-    bucket: bucketConfig.bucket ? "present" : "MISSING",
-    region: bucketConfig.region ? "present" : "MISSING",
-    endpoint: bucketConfig.endpoint ? "present" : "MISSING",
-    accessKeyId: bucketConfig.accessKeyId ? "present" : "MISSING",
-    secretAccessKey: bucketConfig.secretAccessKey ? "present" : "MISSING",
+function hmac(key, value) {
+  return crypto
+    .createHmac("sha256", key)
+    .update(value)
+    .digest();
+}
+
+function sha256(value) {
+  return crypto
+    .createHash("sha256")
+    .update(value)
+    .digest("hex");
+}
+
+function awsEncode(value) {
+  return encodeURIComponent(value)
+    .replace(/[!'()*]/g, (character) =>
+      `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+    );
+}
+
+function encodeS3Path(value) {
+  return value
+    .split("/")
+    .map((part) => awsEncode(part))
+    .join("/");
+}
+
+function decodeXml(value) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function getS3RequestUrl(bucketConfig, key = "", query = "") {
+  const endpoint = new URL(bucketConfig.endpoint);
+
+  let hostname;
+  let pathname;
+
+  if (bucketConfig.forcePathStyle) {
+    hostname = endpoint.hostname;
+    pathname = `/${awsEncode(bucketConfig.bucket)}`;
+
+    if (key) {
+      pathname += `/${encodeS3Path(key)}`;
+    }
+  } else {
+    hostname = `${bucketConfig.bucket}.${endpoint.hostname}`;
+    pathname = key ? `/${encodeS3Path(key)}` : "/";
+  }
+
+  const url = new URL(endpoint.toString());
+  url.hostname = hostname;
+  url.pathname = pathname;
+  url.search = query ? `?${query}` : "";
+
+  return url;
+}
+
+function canonicalQuery(params) {
+  return Object.entries(params)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${awsEncode(key)}=${awsEncode(value)}`)
+    .join("&");
+}
+
+function signS3Request(bucketConfig, {
+  method,
+  key = "",
+  query = {},
+  headers = {},
+}) {
+  const now = new Date();
+
+  const amzDate = now
+    .toISOString()
+    .replace(/[:-]|\.\d{3}/g, "");
+
+  const dateStamp = amzDate.slice(0, 8);
+
+  const queryString = canonicalQuery(query);
+
+  const url = getS3RequestUrl(bucketConfig, key, queryString);
+
+  const requestHeaders = {
+    host: url.host,
+    "x-amz-date": amzDate,
+    "x-amz-content-sha256": "UNSIGNED-PAYLOAD",
+    ...headers,
+  };
+
+  const normalizedHeaders = Object.entries(requestHeaders)
+    .map(([name, value]) => [
+      name.toLowerCase().trim(),
+      String(value).trim().replace(/\s+/g, " "),
+    ])
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  const signedHeaders = normalizedHeaders
+    .map(([name]) => name)
+    .join(";");
+
+  const canonicalHeaders = normalizedHeaders
+    .map(([name, value]) => `${name}:${value}\n`)
+    .join("");
+
+  const canonicalRequest = [
+    method,
+    url.pathname || "/",
+    queryString,
+    canonicalHeaders,
+    signedHeaders,
+    "UNSIGNED-PAYLOAD",
+  ].join("\n");
+
+  const credentialScope =
+    `${dateStamp}/${bucketConfig.region}/s3/aws4_request`;
+
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    sha256(canonicalRequest),
+  ].join("\n");
+
+  const kDate = hmac(
+    `AWS4${bucketConfig.secretAccessKey}`,
+    dateStamp
+  );
+
+  const kRegion = hmac(kDate, bucketConfig.region);
+  const kService = hmac(kRegion, "s3");
+  const kSigning = hmac(kService, "aws4_request");
+
+  const signature = crypto
+    .createHmac("sha256", kSigning)
+    .update(stringToSign)
+    .digest("hex");
+
+  requestHeaders.Authorization =
+    `AWS4-HMAC-SHA256 ` +
+    `Credential=${bucketConfig.accessKeyId}/${credentialScope},` +
+    `SignedHeaders=${signedHeaders},` +
+    `Signature=${signature}`;
+
+  return {
+    url,
+    headers: requestHeaders,
+  };
+}
+
+async function s3Request(bucketConfig, {
+  method,
+  key = "",
+  query = {},
+  headers = {},
+}) {
+  const signed = signS3Request(bucketConfig, {
+    method,
+    key,
+    query,
+    headers,
   });
 
-  if (!bucketConfig.bucket || !bucketConfig.endpoint || !bucketConfig.accessKeyId || !bucketConfig.secretAccessKey) {
-    console.log("[getVideoFromBucket] Missing required bucket config, aborting.");
+  return fetch(signed.url, {
+    method,
+    headers: signed.headers,
+    signal: AbortSignal.timeout(30_000),
+  });
+}
+
+async function getVideoFromBucket(bucketConfig) {
+  console.log("[video] Checking Railway bucket:", {
+    bucket: bucketConfig.bucket ? "present" : "MISSING",
+    region: bucketConfig.region || "auto",
+    endpoint: bucketConfig.endpoint || "MISSING",
+    accessKeyId: bucketConfig.accessKeyId ? "present" : "MISSING",
+    secretAccessKey: bucketConfig.secretAccessKey ? "present" : "MISSING",
+    forcePathStyle: bucketConfig.forcePathStyle,
+  });
+
+  if (
+    !bucketConfig.bucket ||
+    !bucketConfig.endpoint ||
+    !bucketConfig.accessKeyId ||
+    !bucketConfig.secretAccessKey
+  ) {
+    console.error("[video] Missing Railway bucket configuration.");
     return null;
   }
 
   try {
-    const bucketUrl = new URL(bucketConfig.endpoint);
-    bucketUrl.pathname = `/${bucketConfig.bucket}`;
-    const listUrl = `${bucketUrl.toString()}?list-type=2&max-keys=100`;
-
-    console.log("[getVideoFromBucket] bucketUrl:", bucketUrl.toString());
-    console.log("[getVideoFromBucket] listUrl:", listUrl);
-
-    // Use basic auth with S3 credentials
-    const auth = Buffer.from(`${bucketConfig.accessKeyId}:${bucketConfig.secretAccessKey}`).toString('base64');
-    
-    const response = await fetch(listUrl, {
+    const response = await s3Request(bucketConfig, {
       method: "GET",
-      headers: {
-        "Authorization": `Basic ${auth}`,
+      query: {
+        "list-type": "2",
+        "max-keys": "100",
       },
-      signal: AbortSignal.timeout(10_000),
-    }).catch((err) => {
-      console.log("[getVideoFromBucket] fetch threw an error:", err);
-      return null;
     });
 
-    if (!response) {
-      console.log("[getVideoFromBucket] No response received from fetch (request failed or timed out).");
-      return null;
-    }
+    console.log(
+      "[video] ListObjectsV2 response:",
+      response.status,
+      response.statusText
+    );
 
-    console.log("[getVideoFromBucket] response status:", response.status, response.statusText);
+    const body = await response.text();
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => "<unable to read body>");
-      console.log("[getVideoFromBucket] response not OK. Body (first 500 chars):", errorText.slice(0, 500));
+      console.error(
+        "[video] Bucket listing failed:",
+        body.slice(0, 1000)
+      );
       return null;
     }
 
-    const text = await response.text();
-    console.log("[getVideoFromBucket] response body (first 500 chars):", text.slice(0, 500));
-    
-    // Parse XML to find first video file
-    const keyMatches = text.match(/<Key>([^<]+)<\/Key>/g);
-    console.log("[getVideoFromBucket] number of XML keys found:", keyMatches ? keyMatches.length : 0);
+    // S3 ListObjectsV2 XML:
+    // <Contents><Key>some-video.mp4</Key></Contents>
+    const keys = [];
 
-    if (!keyMatches) {
-      console.log("[getVideoFromBucket] No <Key> entries found in response, bucket may be empty.");
+    const keyRegex = /<Key>([\s\S]*?)<\/Key>/g;
+    let match;
+
+    while ((match = keyRegex.exec(body)) !== null) {
+      keys.push(decodeXml(match[1]));
+    }
+
+    console.log("[video] Objects found:", keys.length);
+
+    const videos = keys.filter(isVideoFile);
+
+    console.log("[video] Video files found:", videos);
+
+    if (!videos.length) {
+      console.error("[video] No video files found in bucket.");
       return null;
     }
 
-    for (const match of keyMatches) {
-      const key = match.replace(/<\/?Key>/g, "");
-      const matches = isVideoFile(key);
-      console.log(`[getVideoFromBucket] checking key "${key}" - matches video regex: ${matches}`);
-      if (matches) {
-        console.log(`[getVideoFromBucket] Found video file: "${key}"`);
-        return key;
-      }
-    }
-    console.log("[getVideoFromBucket] No keys matched the video file regex. No video found.");
-    return null;
+    // Return the first video currently present.
+    // Therefore /video does not depend on a fixed filename.
+    return videos[0];
   } catch (error) {
-    console.error("Error listing bucket videos:", error);
+    console.error("[video] Error listing Railway bucket:", error);
     return null;
   }
 }
 
-async function streamVideoFromBucket(bucketConfig, videoKey, response) {
+async function streamVideoFromBucket(bucketConfig, videoKey, request, response) {
   try {
-    const bucketUrl = new URL(bucketConfig.endpoint);
-    bucketUrl.pathname = `/${bucketConfig.bucket}/${encodeURIComponent(videoKey)}`;
+    const range = request.headers.range;
 
-    const auth = Buffer.from(`${bucketConfig.accessKeyId}:${bucketConfig.secretAccessKey}`).toString('base64');
+    const requestHeaders = {};
 
-    const videoResponse = await fetch(bucketUrl.toString(), {
-      method: "GET",
-      headers: {
-        "Authorization": `Basic ${auth}`,
-      },
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    if (!videoResponse.ok) {
-      return sendError(response, 502, "Could not fetch video from storage.");
+    if (range) {
+      requestHeaders.range = range;
     }
 
-    const contentType = getVideoContentType(videoKey);
-    const contentLength = videoResponse.headers.get("content-length");
+    const method = request.method === "HEAD" ? "HEAD" : "GET";
+
+    const videoResponse = await s3Request(bucketConfig, {
+      method,
+      key: videoKey,
+      headers: requestHeaders,
+    });
+
+    console.log(
+      `[video] ${method} ${videoKey}:`,
+      videoResponse.status,
+      videoResponse.statusText,
+      range ? `(range ${range})` : ""
+    );
+
+    if (!videoResponse.ok && videoResponse.status !== 206) {
+      const errorText = await videoResponse.text().catch(() => "");
+
+      console.error(
+        "[video] Object request failed:",
+        videoResponse.status,
+        errorText.slice(0, 500)
+      );
+
+      return sendError(
+        response,
+        502,
+        "Could not fetch video from storage."
+      );
+    }
+
     const headers = {
-      "Content-Type": contentType,
-      "Cache-Control": "public, max-age=86400",
-      "Accept-Ranges": "bytes",
+      "Content-Type":
+        videoResponse.headers.get("content-type") ||
+        getVideoContentType(videoKey),
+
+      "Cache-Control": "no-cache",
+
+      "Accept-Ranges":
+        videoResponse.headers.get("accept-ranges") || "bytes",
     };
+
+    const contentLength =
+      videoResponse.headers.get("content-length");
+
+    const contentRange =
+      videoResponse.headers.get("content-range");
+
+    const etag =
+      videoResponse.headers.get("etag");
+
+    const lastModified =
+      videoResponse.headers.get("last-modified");
 
     if (contentLength) {
       headers["Content-Length"] = contentLength;
     }
 
-    response.writeHead(200, headers);
+    if (contentRange) {
+      headers["Content-Range"] = contentRange;
+    }
+
+    if (etag) {
+      headers.ETag = etag;
+    }
+
+    if (lastModified) {
+      headers["Last-Modified"] = lastModified;
+    }
+
+    const status =
+      videoResponse.status === 206 ? 206 : 200;
+
+    response.writeHead(status, headers);
+
+    if (request.method === "HEAD") {
+      return response.end();
+    }
+
+    if (!videoResponse.body) {
+      return response.end();
+    }
 
     const nodeStream = Readable.fromWeb(videoResponse.body);
-    nodeStream.on("error", () => {
+
+    nodeStream.on("error", (error) => {
+      console.error("[video] Stream error:", error);
+
       if (!response.headersSent) {
         sendError(response, 502, "Video stream failed.");
       } else {
         response.destroy();
       }
     });
+
     nodeStream.pipe(response);
   } catch (error) {
-    console.error("Error streaming video:", error);
+    console.error("[video] Error streaming video:", error);
+
     if (!response.headersSent) {
       sendError(response, 502, "Could not stream video.");
     } else {
@@ -523,20 +770,55 @@ export function createApp(options = {}) {
 
     if (!pathname) return sendError(response, 400, "Invalid request path.");
 
-    if (pathname === "/video" || pathname.startsWith("/video/")) {
-  const bucketConfig = getBucketConfig();
-  if (!bucketConfig.bucket) {
-    return sendError(response, 503, "Video service is not configured.");
+    if (pathname === "/video") {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return sendError(response, 405, "Method not allowed.");
   }
-  
+
+  const bucketConfig = getBucketConfig();
+
+  if (
+    !bucketConfig.bucket ||
+    !bucketConfig.endpoint ||
+    !bucketConfig.accessKeyId ||
+    !bucketConfig.secretAccessKey
+  ) {
+    console.error("[video] Railway bucket environment variables are missing.");
+
+    return sendError(
+      response,
+      503,
+      "Video service is not configured."
+    );
+  }
+
   try {
     const videoKey = await getVideoFromBucket(bucketConfig);
+
     if (!videoKey) {
-      return sendError(response, 404, "No video available.");
+      return sendError(
+        response,
+        404,
+        "No video available in the bucket."
+      );
     }
-    return streamVideoFromBucket(bucketConfig, videoKey, response);
+
+    console.log("[video] Serving:", videoKey);
+
+    return streamVideoFromBucket(
+      bucketConfig,
+      videoKey,
+      request,
+      response
+    );
   } catch (error) {
-    return sendError(response, 502, "Video service error.");
+    console.error("[video] Route error:", error);
+
+    return sendError(
+      response,
+      502,
+      "Video service error."
+    );
   }
 }
 
