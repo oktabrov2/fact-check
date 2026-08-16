@@ -16,6 +16,8 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.687.0",
+    "@aws-sdk/s3-request-presigner": "^3.687.0",
     "pg": "^8.22.0"
   },
   "devDependencies": {

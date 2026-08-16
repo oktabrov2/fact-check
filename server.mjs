@@ -3,6 +3,7 @@ import http from "node:http";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import { bootstrapEnvironmentAdministrator, createAuth, createUserAuth } from "./lib/auth.mjs";
 import { categoryForKey, categoryLabel, categorySummary, isBlockedPlatformDomain, SOURCE_CATEGORIES } from "./lib/categories.mjs";
 import { assertDatabaseReady, createDatabasePool } from "./lib/db.mjs";
@@ -59,40 +60,37 @@ function isVideoFile(key) {
   return videoExtensions.test(key);
 }
 
-// Use basic HTTP auth with S3-compatible endpoint
+function createS3ClientFromConfig(bucketConfig) {
+  return new S3Client({
+    region: bucketConfig.region || "auto",
+    endpoint: bucketConfig.endpoint,
+    credentials: {
+      accessKeyId: bucketConfig.accessKeyId,
+      secretAccessKey: bucketConfig.secretAccessKey,
+    },
+    forcePathStyle: true,
+  });
+}
+
+// Use the AWS SDK (v3) so requests are signed with AWS Signature V4.
 async function getVideoFromBucket(bucketConfig) {
   if (!bucketConfig.bucket || !bucketConfig.endpoint || !bucketConfig.accessKeyId || !bucketConfig.secretAccessKey) {
     return null;
   }
 
   try {
-    const bucketUrl = new URL(bucketConfig.endpoint);
-    bucketUrl.pathname = `/${bucketConfig.bucket}`;
-    const listUrl = `${bucketUrl.toString()}?list-type=2&max-keys=100`;
+    const client = createS3ClientFromConfig(bucketConfig);
+    const command = new ListObjectsV2Command({
+      Bucket: bucketConfig.bucket,
+      MaxKeys: 100,
+    });
 
-    // Use basic auth with S3 credentials
-    const auth = Buffer.from(`${bucketConfig.accessKeyId}:${bucketConfig.secretAccessKey}`).toString('base64');
-    
-    const response = await fetch(listUrl, {
-      method: "GET",
-      headers: {
-        "Authorization": `Basic ${auth}`,
-      },
-      signal: AbortSignal.timeout(10_000),
-    }).catch(() => null);
+    const result = await client.send(command);
+    const contents = result?.Contents || [];
 
-    if (!response || !response.ok) return null;
-
-    const text = await response.text();
-    
-    // Parse XML to find first video file
-    const keyMatches = text.match(/<Key>([^<]+)<\/Key>/g);
-    if (!keyMatches) return null;
-
-    for (const match of keyMatches) {
-      const key = match.replace(/<\/?Key>/g, "");
-      if (isVideoFile(key)) {
-        return key;
+    for (const object of contents) {
+      if (object?.Key && isVideoFile(object.Key)) {
+        return object.Key;
       }
     }
     return null;
@@ -104,25 +102,20 @@ async function getVideoFromBucket(bucketConfig) {
 
 async function streamVideoFromBucket(bucketConfig, videoKey, response) {
   try {
-    const bucketUrl = new URL(bucketConfig.endpoint);
-    bucketUrl.pathname = `/${bucketConfig.bucket}/${encodeURIComponent(videoKey)}`;
-
-    const auth = Buffer.from(`${bucketConfig.accessKeyId}:${bucketConfig.secretAccessKey}`).toString('base64');
-
-    const videoResponse = await fetch(bucketUrl.toString(), {
-      method: "GET",
-      headers: {
-        "Authorization": `Basic ${auth}`,
-      },
-      signal: AbortSignal.timeout(30_000),
+    const client = createS3ClientFromConfig(bucketConfig);
+    const command = new GetObjectCommand({
+      Bucket: bucketConfig.bucket,
+      Key: videoKey,
     });
 
-    if (!videoResponse.ok) {
+    const videoResponse = await client.send(command);
+
+    if (!videoResponse.Body) {
       return sendError(response, 502, "Could not fetch video from storage.");
     }
 
-    const contentType = getVideoContentType(videoKey);
-    const contentLength = videoResponse.headers.get("content-length");
+    const contentType = videoResponse.ContentType || getVideoContentType(videoKey);
+    const contentLength = videoResponse.ContentLength;
     const headers = {
       "Content-Type": contentType,
       "Cache-Control": "public, max-age=86400",
@@ -130,12 +123,15 @@ async function streamVideoFromBucket(bucketConfig, videoKey, response) {
     };
 
     if (contentLength) {
-      headers["Content-Length"] = contentLength;
+      headers["Content-Length"] = String(contentLength);
     }
 
     response.writeHead(200, headers);
 
-    const nodeStream = Readable.fromWeb(videoResponse.body);
+    const nodeStream = videoResponse.Body instanceof Readable
+      ? videoResponse.Body
+      : Readable.fromWeb(videoResponse.Body);
+
     nodeStream.on("error", () => {
       if (!response.headersSent) {
         sendError(response, 502, "Video stream failed.");
