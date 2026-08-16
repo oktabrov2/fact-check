@@ -335,7 +335,20 @@ async function streamVideoFromBucket(bucketConfig, videoKey, request, response) 
       key: videoKey,
       headers,
     });
+    console.log("[video] S3 GET result:", {
+  status: videoResponse.status,
+  ok: videoResponse.ok,
+  url: videoResponse.url,
+  contentType: videoResponse.headers.get("content-type"),
+  contentLength: videoResponse.headers.get("content-length"),
+  contentRange: videoResponse.headers.get("content-range"),
+  acceptRanges: videoResponse.headers.get("accept-ranges"),
+  etag: videoResponse.headers.get("etag"),
+});
+    const body = await videoResponse.arrayBuffer();
+const bytes = new Uint8Array(body.slice(0, 16));
 
+console.log("[video] first bytes:", Array.from(bytes));
     if (!videoResponse.ok && videoResponse.status !== 206) {
       console.error(
         "[video] S3 GetObject failed:",
