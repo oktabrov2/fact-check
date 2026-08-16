@@ -743,7 +743,7 @@ export function createApp(options = {}) {
 
     if (!pathname) return sendError(response, 400, "Invalid request path.");
 
-if (pathname === "/video") {
+if (pathname === "/video-stream") {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return sendError(response, 405, "Method not allowed.");
   }
