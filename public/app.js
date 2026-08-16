@@ -1019,7 +1019,7 @@ function renderNotFound() {
 function render() {
   const pathname = window.location.pathname.replace(/\/$/, "") || "/";
   document.title = titleFor(pathname);
-  const renderers = { "/": renderHome, "/check": renderCheck, "/sources": renderSources, "/method": renderMethodV2, "/about": renderAboutV2, "/contact": renderContact, "/privacy": renderPrivacy, "/accessibility": renderAccessibility, "/login": renderLogin, "/signup": renderSignup, "/account": renderAccount, "/donate": renderDonate, "/admin": renderAdmin };
+  const renderers = { "/": renderHome, "/check": renderCheck, "/video": renderVideo, "/sources": renderSources, "/method": renderMethodV2, "/about": renderAboutV2, "/contact": renderContact, "/privacy": renderPrivacy, "/accessibility": renderAccessibility, "/login": renderLogin, "/signup": renderSignup, "/account": renderAccount, "/donate": renderDonate, "/admin": renderAdmin };
   (renderers[pathname] || renderNotFound)();
   updateNav();
   observeReveals();
