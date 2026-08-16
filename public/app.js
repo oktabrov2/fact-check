@@ -331,7 +331,7 @@ function renderVideo() {
         <div class="video-card glass-card reveal">
           <video
             class="video-player"
-            src="/video"
+            src="/video-stream"
             controls
             playsinline
             preload="metadata"
