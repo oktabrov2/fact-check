@@ -162,6 +162,15 @@ function observeReveals() {
 function renderAccountNav() {
   const accountNav = document.querySelector("#account-nav");
   if (!accountNav) return;
+
+  const pathname = window.location.pathname.replace(/\/$/, "") || "/";
+  const isVideoPage = pathname === "/video";
+
+  if (isVideoPage && !isSignedIn()) {
+    accountNav.innerHTML = "";
+    return;
+  }
+
   if (isSignedIn()) {
     const adminPanel = state.adminUser
       ? `<a class="nav-utility-admin" href="/admin" data-route>Admin panel</a>`
