@@ -64,8 +64,7 @@ function titleFor(pathname) {
     "/": "Fact-Check — Evidence, not noise",
     "/check": "Verify a claim — Fact-Check",
     "/sources": "Source Library — Fact-Check",
-    "/method": "The Process — Fact-Check",
-    "/about": "Why it matters — Fact-Check",
+    "/docs": "Documentation — Fact-Check",
     "/contact": "Contact Fact-Check",
     "/privacy": "Privacy — Fact-Check",
     "/accessibility": "Accessibility — Fact-Check",
@@ -339,7 +338,7 @@ function renderHome() {
 
     <section class="section"><div class="page"><div class="callout reveal"><span class="callout-icon" aria-hidden="true">!</span><div><h3>Fact-Check is not a universal truth machine.</h3><p>It reports what selected sources do or do not support at the time of a check. People can inspect the sources, question a conclusion, and take high-stakes claims to qualified human experts.</p></div></div></div></section>
 
-    <section class="page"><div class="cta-panel reveal"><span class="eyebrow">Start with the evidence</span><h2>Make checking before sharing a normal habit.</h2><p>Use the checker for a current claim, an image, or a story you are unsure about. Every result stays within the public source registry and points you back to the original evidence.</p><div class="inline-actions"><a class="btn btn-primary" href="/check" data-route>Check a claim <span aria-hidden="true">→</span></a><a class="btn btn-secondary" href="/method" data-route>Read the method</a></div></div></section>`;
+    <section class="page"><div class="cta-panel reveal"><span class="eyebrow">Start with the evidence</span><h2>Make checking before sharing a normal habit.</h2><p>Use the checker for a current claim, an image, or a story you are unsure about. Every result stays within the public source registry and points you back to the original evidence.</p><div class="inline-actions"><a class="btn btn-primary" href="/check" data-route>Check a claim <span aria-hidden="true">→</span></a><a class="btn btn-secondary" href="/docs" data-route>Read the docs</a></div></div></section>`;
   hydrateSourceCount();
   hydrateRegistryOverview();
 }
@@ -815,27 +814,142 @@ async function bindSources() {
   }
 }
 
-function renderMethod() {
-  renderMethodV2();
-}
-
-function renderAbout() {
-  renderAboutV2();
-}
-function renderMethodV2() {
-  app.innerHTML = `${pageHead("The Process", "Two AI steps. <em>One enforced boundary.</em>", "Fact-Check separates source routing from evidence searching so the system cannot answer first and justify itself later.")}
-    <section class="page method-grid">
-      <div><article class="method-card glass-card reveal"><span class="eyebrow">Step 01 · Category routing</span><h2>Decide where to look before looking.</h2><p>The first request receives the claim and the fixed registry taxonomy. It selects the smallest relevant set of categories — for example, weather and emergencies plus government and law for a report of a hurricane in the United States.</p><p>That routing request has no web-search tool and is not allowed to produce a fact-check verdict.</p></article><article class="method-card glass-card reveal"><span class="eyebrow">Step 02 · Evidence search</span><h2>Search only the reviewed domain set.</h2><p>A new request receives only sources in the selected categories that have a completed source-use review, plus a server-enforced allowed-domain filter. Returned citations are checked against the same selected domains before they are shown.</p><p>The result keeps links and titles only, with a short paraphrased explanation rather than search-provider excerpts. Each evidence search is capped at 100 approved domains. If no reviewed source is available for a category, the result is marked insufficient instead of widening the search.</p></article></div>
-      <aside class="quote-card glass-card reveal"><blockquote>“A fast answer is not enough. A trustworthy answer shows where it came from and where its limits are.”</blockquote><cite>Fact-Check evidence standard</cite></aside>
+function renderDocs() {
+  app.innerHTML = `
+    <section class="page docs-hero reveal">
+      <div class="docs-meta">
+        <span class="eyebrow">Documentation</span>
+        <span class="docs-version">Registry v11</span>
+      </div>
+      <h1>Reference &amp; methodology</h1>
+      <p class="lead">How Fact-Check produces a verdict, how the source registry is governed, and how to call the API.</p>
+      <nav class="docs-toc" aria-label="Table of contents">
+        <a href="#overview">Overview</a>
+        <a href="#methodology">Methodology</a>
+        <a href="#registry">Source registry</a>
+        <a href="#api">API reference</a>
+        <a href="#limits">Rate limits</a>
+        <a href="#limitations">Limitations</a>
+      </nav>
     </section>
-    <section class="section section-tint"><div class="page"><div class="section-head reveal"><span class="eyebrow">Built-in safeguards</span><h2>Designed to be inspectable at every step.</h2></div><div class="principles glass-card reveal"><article class="principle"><span>01 / CATEGORY CONTROL</span><h3>Categories are fixed, not invented on the fly.</h3><p>The model can select only categories defined by the platform. It cannot create a vague “general web” category to escape the source boundary.</p></article><article class="principle"><span>02 / DOMAIN CONTROL</span><h3>The second request receives only selected trusted domains.</h3><p>The boundary is applied at the API request level, then citations are validated again on the server before the result is displayed.</p></article><article class="principle"><span>03 / SOURCE ADMISSION</span><h3>New sources require AI analysis and manual confirmation.</h3><p>Administrators submit a first-party HTTPS domain. A high-confidence source assessment and human confirmation are required before it can become active.</p></article><article class="principle"><span>04 / CLEAR LIMITS</span><h3>Uncertainty remains a valid result.</h3><p>If selected sources do not provide enough evidence, Fact-Check says so. It does not treat an empty search as proof that a claim is false.</p></article></div></div></section>
-    <section class="page"><div class="callout reveal"><span class="callout-icon" aria-hidden="true">!</span><div><h3>High-stakes claims need more than a single result.</h3><p>For urgent health, safety, legal, financial, or emergency decisions, use the original authorities and qualified experts directly. Fact-Check is an evidence-navigation platform, not a substitute for professional advice.</p></div></div></section>`;
-}
 
-function renderAboutV2() {
-  app.innerHTML = `${pageHead("Why it matters", "Media literacy needs <em>practical tools.</em>", "AI can make misleading content more convincing and easier to spread. Fact-Check gives people a concrete way to pause, identify relevant authorities, and inspect the evidence before they share.")}
-    <section class="page about-grid"><article class="about-card glass-card reveal"><span class="eyebrow">Independent youth-led platform</span><h2>Make verification a normal part of receiving information.</h2><p>Fact-Check is designed as a real, transparent platform for media and information literacy. Instead of presenting a black-box “true” or “false” label, it reveals the category boundary, the linked evidence, and the limits of the result.</p><p>It responds to AI-amplified misinformation by making source-aware verification usable in everyday questions, not only in specialist newsrooms.</p></article><article class="about-card glass-card reveal"><span class="eyebrow">Participation with standards</span><h3>Access should be simple. Evidence standards should stay high.</h3><p>Anyone can inspect the public source library and download its current directory. Signing in is required before a claim or image is sent to the protected verification workflow. At the same time, source admission is deliberately strict: broad social-platform domains cannot enter an automated allowed-domain boundary.</p><h3>Trust deserves questions.</h3><p>People can inspect citations, question a result, and suggest first-party public authorities for review. That keeps the platform accountable to the communities it is meant to serve.</p></article></section>
-    <section class="section section-tint"><div class="page"><div class="section-head reveal"><span class="eyebrow">Long-term contribution</span><h2>Grow a culture of checking before sharing.</h2></div><div class="feature-grid"><article class="feature-card glass-card reveal"><span class="feature-number">NOW</span><div class="feature-icon" aria-hidden="true">⌕</div><h3>Make the evidence boundary visible</h3><p>Provide a transparent, categorized registry and concise linked results that are easy to inspect.</p></article><article class="feature-card glass-card reveal"><span class="feature-number">NEXT</span><div class="feature-icon" aria-hidden="true">◌</div><h3>Improve local relevance responsibly</h3><p>Expand first-party public authorities through strict review, especially for the languages and communities using the platform.</p></article><article class="feature-card glass-card reveal"><span class="feature-number">LATER</span><div class="feature-icon" aria-hidden="true">↗</div><h3>Measure evidence quality</h3><p>Continuously evaluate citation quality, source freshness, accessibility, and false-verdict risk as the platform grows.</p></article></div></div></section>`;
+    <section class="page docs-body">
+      <article id="overview" class="docs-section">
+        <h2>Overview</h2>
+        <p>Fact-Check is an evidence-navigation platform. A signed-in member submits a claim (text or image); the platform routes it to the smallest relevant set of trusted-source categories, runs a restricted web search inside only those approved domains, and returns a short verdict, a paraphrased answer, and direct links to the exact articles that support it.</p>
+        <p>The system separates routing from evidence generation so it cannot answer first and justify itself later. Every citation is validated server-side before it can reach the user.</p>
+      </article>
+
+      <article id="methodology" class="docs-section">
+        <h2>Verification methodology</h2>
+        <ol class="docs-steps">
+          <li>
+            <span class="docs-step-num">01</span>
+            <div>
+              <h3>Category routing</h3>
+              <p>A first AI request receives the claim and the fixed 14-category taxonomy. It selects one to three categories. This request has no web-search tool and is not permitted to return a verdict.</p>
+            </div>
+          </li>
+          <li>
+            <span class="docs-step-num">02</span>
+            <div>
+              <h3>Restricted evidence search</h3>
+              <p>A separate AI request receives only the domains from the selected categories (max 100 domains per check). Its web search is filtered by an allowed-domain boundary. Every returned citation is re-validated server-side against the same list before it can appear.</p>
+            </div>
+          </li>
+          <li>
+            <span class="docs-step-num">03</span>
+            <div>
+              <h3>Structured result</h3>
+              <p>The AI returns a JSON object with verdict, concise answer, and per-source <code>{url, title, summary, publishedAt}</code>. Verdicts fall to <code>INSUFFICIENT</code> unless at least one validated citation survives — an empty search never becomes proof of falsehood.</p>
+            </div>
+          </li>
+        </ol>
+      </article>
+
+      <article id="registry" class="docs-section">
+        <h2>Source registry policy</h2>
+        <p>The public registry seeds <strong>110 first-party entries</strong> across 14 categories. Every entry has passed a documented source-use review with a linked official terms or licence URL. Sources without a completed review are removed from the public directory rather than displayed as unusable entries.</p>
+        <h3>Admission requirements</h3>
+        <ul class="docs-list">
+          <li>HTTPS-only (no HTTP, no custom ports, no basic-auth credentials in URL)</li>
+          <li>Not a social-platform domain — <code>t.me</code>, <code>facebook.com</code>, <code>x.com</code>, <code>tiktok.com</code>, <code>youtube.com</code>, and similar are permanently blocked</li>
+          <li>AI source-review assigns a category with high confidence</li>
+          <li>Administrator manually confirms official ownership and evidence scope</li>
+          <li>Official terms or licence page recorded in the audit table before the source becomes active</li>
+        </ul>
+        <h3>Governance</h3>
+        <p>Every admission or edit writes an entry to <code>source_admission_reviews</code> in PostgreSQL, including the reviewer's manual-confirmation flag and the AI's confidence and reason. A source can belong to multiple categories; category totals overlap while the public-entry total stays unique.</p>
+      </article>
+
+      <article id="api" class="docs-section">
+        <h2>API reference</h2>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="docs-method docs-method-get">GET</span><code>/api/health</code></div>
+          <p>Public. Returns <code>{ok, database, apiConfigured, activeSources, activeDomains, automatedCheckSources, automatedCheckDomains, model}</code>. Also accepts <code>HEAD</code>.</p>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="docs-method docs-method-get">GET</span><code>/api/sources</code></div>
+          <p>Public. Returns the current registry with sources, categories, counts, and registry version. Optional query params: <code>?q=</code> (search) and <code>?category=</code> (category key filter).</p>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="docs-method docs-method-get">GET</span><code>/api/sources.pdf</code></div>
+          <p>Public. Returns the current registry as a downloadable PDF, named by version.</p>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="docs-method docs-method-post">POST</span><code>/api/check</code></div>
+          <p>Requires a member or administrator session cookie. Runs the full two-step verification pipeline.</p>
+          <pre class="docs-code">{
+  "claim": "Did a hurricane make landfall in the United States yesterday?",
+  "imageDataUrl": "data:image/png;base64,..."   // optional
+}</pre>
+          <p class="docs-note">Response fields: <code>verdict</code>, <code>answer</code>, <code>sources[]</code> (each with <code>url</code>, <code>title</code>, <code>summary</code>, <code>publishedAt</code>, <code>category</code>, <code>firstParty</code>), <code>categorySelection</code>, <code>checkedAt</code>, <code>model</code>, <code>registryVersion</code>.</p>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="docs-method docs-method-post">POST</span><code>/api/auth/signup</code></div>
+          <p>Public. Body: <code>{name, email, password}</code>. Password minimum is 12 characters. Sets a member session cookie on success.</p>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="docs-method docs-method-post">POST</span><code>/api/auth/login</code></div>
+          <p>Public. Body: <code>{email, password}</code>. Administrator emails auto-route to the administrator session on match.</p>
+        </div>
+
+        <div class="docs-endpoint">
+          <div class="docs-endpoint-head"><span class="docs-method docs-method-get">GET</span><code>/api/auth/status</code></div>
+          <p>Public. Returns <code>{user, administrator}</code>; each is either the current session's profile or <code>null</code>.</p>
+        </div>
+      </article>
+
+      <article id="limits" class="docs-section">
+        <h2>Rate limits</h2>
+        <ul class="docs-list">
+          <li><strong>Verification</strong> — 8 requests per 15 minutes per IP</li>
+          <li><strong>Account operations</strong> — 12 signup/login attempts per 15 minutes per IP</li>
+          <li><strong>Administrator sign-in</strong> — 8 attempts per 15 minutes per IP</li>
+          <li><strong>Evidence search cap</strong> — 100 approved domains per check (round-robin selection across categories)</li>
+          <li><strong>Claim length</strong> — 1,800 characters</li>
+          <li><strong>Image upload</strong> — 4 MB max, PNG / JPG / WEBP / GIF only</li>
+        </ul>
+      </article>
+
+      <article id="limitations" class="docs-section">
+        <h2>Limitations</h2>
+        <p>Fact-Check does not claim to be a universal truth machine. It reports what a defined public source boundary supports at the time of a check.</p>
+        <ul class="docs-list">
+          <li>Insufficient evidence is not proof a claim is false</li>
+          <li>Approved-domain scope is not article-level review — citations are shown so users can inspect the specific evidence</li>
+          <li>Social-platform posts, unlisted websites, and open-web content are intentionally excluded</li>
+          <li>Source-use reviews describe source-owned material only; trademarks, logos, photos, and third-party rights remain excluded</li>
+          <li>For high-stakes decisions (health, legal, financial, emergency), consult the original authorities and qualified experts directly</li>
+        </ul>
+      </article>
+    </section>`;
 }
 
 function renderContact() {
@@ -1164,7 +1278,7 @@ async function renderAccount() {
       ? `Contributions are securely processed by ${escapeHtml(donation.provider)} on its hosted payment page.`
       : "Donations are being prepared. The donation page explains the secure provider setup required before any payment is accepted.";
 
-    app.innerHTML = `<section class="page profile-page"><article class="profile-hero glass-card reveal visible"><div class="profile-identity"><div class="profile-avatar" aria-hidden="true">${escapeHtml(profileInitials(user))}</div><div><span class="eyebrow">${accountType}</span><h1>${escapeHtml(user.name)}</h1><p class="account-email">${escapeHtml(user.email)}</p><p class="profile-member">Member since ${escapeHtml(formatDate(user.createdAt, { short: true }))}</p></div></div><div class="profile-session"><span class="status-pill">● Signed in</span><span>${administrator ? "Registry manager" : "Verification member"}</span></div></article><section class="profile-grid"><article class="profile-panel glass-card reveal"><span class="mini-label">Account access</span><h2>Your verification space is ready.</h2><p>${accessCopy}</p><div class="profile-actions"><a class="btn btn-primary" href="/check" data-route>Verify a claim <span aria-hidden="true">→</span></a><a class="btn btn-secondary" href="/sources" data-route>Browse sources</a>${adminPanel}</div></article><article class="profile-panel glass-card reveal"><span class="mini-label">Account details</span><h2>Clear, private, in your control.</h2><dl class="profile-details"><div><dt>Email address</dt><dd>${escapeHtml(user.email)}</dd></div><div><dt>Account role</dt><dd>${administrator ? "Administrator" : "Member"}</dd></div><div><dt>Verification access</dt><dd>Enabled</dd></div></dl></article><article class="profile-panel profile-support glass-card reveal"><span class="mini-label">Support Fact-Check</span><h2>Help keep evidence access open.</h2><p>${donationStatus}</p><div class="profile-actions">${donationActionMarkup(donation)}<a class="text-action" href="/donate" data-route>See support details →</a></div></article><article class="profile-panel glass-card reveal"><span class="mini-label">What stays public</span><h2>Source transparency, without open access to checks.</h2><p>The public source library and method stay open to everyone. Your profile gives you access to the protected verification workspace and its account safeguards.</p><a class="text-action" href="/method" data-route>Read the verification method →</a></article></section></section>`;
+    app.innerHTML = `<section class="page profile-page"><article class="profile-hero glass-card reveal visible"><div class="profile-identity"><div class="profile-avatar" aria-hidden="true">${escapeHtml(profileInitials(user))}</div><div><span class="eyebrow">${accountType}</span><h1>${escapeHtml(user.name)}</h1><p class="account-email">${escapeHtml(user.email)}</p><p class="profile-member">Member since ${escapeHtml(formatDate(user.createdAt, { short: true }))}</p></div></div><div class="profile-session"><span class="status-pill">● Signed in</span><span>${administrator ? "Registry manager" : "Verification member"}</span></div></article><section class="profile-grid"><article class="profile-panel glass-card reveal"><span class="mini-label">Account access</span><h2>Your verification space is ready.</h2><p>${accessCopy}</p><div class="profile-actions"><a class="btn btn-primary" href="/check" data-route>Verify a claim <span aria-hidden="true">→</span></a><a class="btn btn-secondary" href="/sources" data-route>Browse sources</a>${adminPanel}</div></article><article class="profile-panel glass-card reveal"><span class="mini-label">Account details</span><h2>Clear, private, in your control.</h2><dl class="profile-details"><div><dt>Email address</dt><dd>${escapeHtml(user.email)}</dd></div><div><dt>Account role</dt><dd>${administrator ? "Administrator" : "Member"}</dd></div><div><dt>Verification access</dt><dd>Enabled</dd></div></dl></article><article class="profile-panel profile-support glass-card reveal"><span class="mini-label">Support Fact-Check</span><h2>Help keep evidence access open.</h2><p>${donationStatus}</p><div class="profile-actions">${donationActionMarkup(donation)}<a class="text-action" href="/donate" data-route>See support details →</a></div></article><article class="profile-panel glass-card reveal"><span class="mini-label">What stays public</span><h2>Source transparency, without open access to checks.</h2><p>The public source library and documentation stay open to everyone. Your profile gives you access to the protected verification workspace and its account safeguards.</p><a class="text-action" href="/docs" data-route>Read the documentation →</a></article></section></section>`;
     observeReveals();
   } catch (error) {
     app.innerHTML = `<section class="page"><div class="warning">${escapeHtml(error.message)}</div></section>`;
@@ -1192,7 +1306,7 @@ function renderNotFound() {
 function render() {
   const pathname = window.location.pathname.replace(/\/$/, "") || "/";
   document.title = titleFor(pathname);
-  const renderers = { "/": renderHome, "/check": renderCheck, "/video": renderVideo, "/sources": renderSources, "/method": renderMethodV2, "/about": renderAboutV2, "/contact": renderContact, "/privacy": renderPrivacy, "/accessibility": renderAccessibility, "/login": renderLogin, "/signup": renderSignup, "/account": renderAccount, "/donate": renderDonate, "/admin": renderAdmin };
+  const renderers = { "/": renderHome, "/check": renderCheck, "/video": renderVideo, "/sources": renderSources, "/docs": renderDocs, "/contact": renderContact, "/privacy": renderPrivacy, "/accessibility": renderAccessibility, "/login": renderLogin, "/signup": renderSignup, "/account": renderAccount, "/donate": renderDonate, "/admin": renderAdmin };
   (renderers[pathname] || renderNotFound)();
   updateNav();
   observeReveals();
