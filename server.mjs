@@ -335,16 +335,7 @@ async function streamVideoFromBucket(bucketConfig, videoKey, request, response) 
       key: videoKey,
       headers,
     });
-    console.log("[video] S3 GET result:", {
-  status: videoResponse.status,
-  ok: videoResponse.ok,
-  url: videoResponse.url,
-  contentType: videoResponse.headers.get("content-type"),
-  contentLength: videoResponse.headers.get("content-length"),
-  contentRange: videoResponse.headers.get("content-range"),
-  acceptRanges: videoResponse.headers.get("accept-ranges"),
-  etag: videoResponse.headers.get("etag"),
-});
+
     if (!videoResponse.ok && videoResponse.status !== 206) {
       console.error(
         "[video] S3 GetObject failed:",
@@ -520,30 +511,45 @@ function domainsFromSources(sources) {
   return [...new Set(sources.map((source) => source.domain))].sort();
 }
 
-function sourceLabelForSelectedUrl(candidate, sources) {
+function registryEntryForUrl(candidate, sources) {
   try {
     const checkedUrl = new URL(candidate);
-    if (checkedUrl.protocol !== "https:") return "";
+    if (checkedUrl.protocol !== "https:") return null;
     const domain = sourceDomain(checkedUrl);
-    const match = sources.find((source) => domain === source.domain || domain.endsWith("." + source.domain));
-    return match?.name || "";
+    return sources.find((source) => domain === source.domain || domain.endsWith("." + source.domain)) || null;
   } catch {
-    return "";
+    return null;
   }
 }
 
-function publicCitations(sources, isApprovedUrl, sourceLabelForUrl) {
+function sourceLabelForSelectedUrl(candidate, sources) {
+  return registryEntryForUrl(candidate, sources)?.name || "";
+}
+
+function categoryLabelForUrl(candidate, sources) {
+  const entry = registryEntryForUrl(candidate, sources);
+  if (!entry) return "";
+  return entry.categoryLabels?.[0] || entry.category || "";
+}
+
+function publicCitations(sources, isApprovedUrl, sourceLabelForUrl, categoryLabelForUrlFn = () => "") {
   const citations = [];
   const seen = new Set();
   for (const source of Array.isArray(sources) ? sources : []) {
     const url = String(source?.url || "").trim();
     if (!url || seen.has(url) || !isApprovedUrl(url)) continue;
     const suppliedTitle = String(source?.title || "").replace(/\s+/g, " ").trim().slice(0, 200);
+    const summary = String(source?.summary || "").replace(/\s+/g, " ").trim().slice(0, 320);
+    const publishedAt = source?.publishedAt || null;
     citations.push({
       url,
       title: suppliedTitle && suppliedTitle !== "Approved source"
         ? suppliedTitle
         : (sourceLabelForUrl(url) || "Approved source"),
+      summary,
+      publishedAt,
+      category: categoryLabelForUrlFn(url),
+      firstParty: true,
     });
     seen.add(url);
   }
@@ -555,9 +561,9 @@ function evidenceVerdict(value) {
   return EVIDENCE_VERDICTS.has(verdict) ? verdict : "INSUFFICIENT";
 }
 
-function publicEvidenceResult(result, isApprovedUrl, sourceLabelForUrl) {
+function publicEvidenceResult(result, isApprovedUrl, sourceLabelForUrl, categoryLabelForUrlFn) {
   const verdict = evidenceVerdict(result?.verdict);
-  const citations = publicCitations(result?.sources, isApprovedUrl, sourceLabelForUrl);
+  const citations = publicCitations(result?.sources, isApprovedUrl, sourceLabelForUrl, categoryLabelForUrlFn);
   const answer = String(result?.answer || result?.explanation || "").replace(/\s+/g, " ").trim().slice(0, 520);
 
   // A verdict without a validated citation is not a completed fact check. The
@@ -750,53 +756,37 @@ export function createApp(options = {}) {
     const requestUrl = new URL(request.url || "/", "http://localhost");
     const pathname = safePathname(requestUrl.pathname);
 
-if (pathname === "/video-stream") {
-  console.log("[video] ROUTE HIT", request.method, pathname);
+    if (!pathname) return sendError(response, 400, "Invalid request path.");
 
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    return sendError(response, 405, "Method not allowed.");
-  }
+    if (pathname === "/video-stream") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return sendError(response, 405, "Method not allowed.");
+      }
 
-  const bucketConfig = getBucketConfig();
+      const bucketConfig = getBucketConfig();
 
-  console.log("[video] bucket config:", {
-    bucket: Boolean(bucketConfig.bucket),
-    endpoint: Boolean(bucketConfig.endpoint),
-    region: bucketConfig.region,
-    accessKeyId: Boolean(bucketConfig.accessKeyId),
-    secretAccessKey: Boolean(bucketConfig.secretAccessKey),
-  });
+      if (
+        !bucketConfig.bucket ||
+        !bucketConfig.endpoint ||
+        !bucketConfig.accessKeyId ||
+        !bucketConfig.secretAccessKey
+      ) {
+        return sendError(response, 503, "Video service is not configured.");
+      }
 
-  if (
-    !bucketConfig.bucket ||
-    !bucketConfig.endpoint ||
-    !bucketConfig.accessKeyId ||
-    !bucketConfig.secretAccessKey
-  ) {
-    return sendError(response, 503, "Video service is not configured.");
-  }
+      try {
+        const videoKey = await getVideoFromBucket(bucketConfig);
 
-  try {
-    const videoKey = await getVideoFromBucket(bucketConfig);
+        if (!videoKey) {
+          return sendError(response, 404, "No video available in the bucket.");
+        }
 
-    console.log("[video] selected key:", videoKey);
-
-    if (!videoKey) {
-      return sendError(response, 404, "No video available in the bucket.");
+        return streamVideoFromBucket(bucketConfig, videoKey, request, response);
+      } catch (error) {
+        console.error("[video] Error handling video stream:", error);
+        return sendError(response, 502, "Video service error.");
+      }
     }
-
-    return streamVideoFromBucket(
-      bucketConfig,
-      videoKey,
-      request,
-      response
-    );
-  } catch (error) {
-    console.error("[video] ROUTE ERROR:", error);
-
-    return sendError(response, 502, "Video service error.");
-  }
-}
 
     try {
       if (pathname === "/api/health" && (request.method === "GET" || request.method === "HEAD")) {
@@ -954,6 +944,7 @@ if (pathname === "/video-stream") {
           result,
           isApprovedUrl,
           (candidate) => sourceLabelForSelectedUrl(candidate, selected.sources),
+          (candidate) => categoryLabelForUrl(candidate, selected.sources),
         );
         return sendJson(response, 200, {
           verdict: publicResult.verdict,

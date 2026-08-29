@@ -129,18 +129,24 @@ test("evidence searches require a structured final answer and omit citations for
   const originalFetch = globalThis.fetch;
   const citation = {
     type: "url_citation",
-    url_citation: { url: "https://www.nhc.noaa.gov/archive/", title: "NHC archive" },
+    url_citation: { url: "https://www.nhc.noaa.gov/archive/2026/al09/", title: "AL092026 advisory archive" },
   };
-  const responseFor = (verdict, answer) => ({
+  const declaredSources = [{
+    url: "https://www.nhc.noaa.gov/archive/2026/al09/",
+    title: "AL092026 advisory archive",
+    summary: "The archive shows no advisory issued for the claimed landfall window.",
+    publishedAt: "2026-08-27",
+  }];
+  const responseFor = (verdict, answer, sources) => ({
     ok: true,
     json: async () => ({
-      output_text: JSON.stringify({ verdict, answer }),
-      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ verdict, answer }), annotations: [citation] }] }],
+      output_text: JSON.stringify({ verdict, answer, sources }),
+      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ verdict, answer, sources }), annotations: [citation] }] }],
     }),
   });
   const queuedResponses = [
-    responseFor("CONTRADICTED", "No. The official record does not report the claimed landfall."),
-    responseFor("INSUFFICIENT", "There is not enough reliable information in the selected sources to verify this claim."),
+    responseFor("CONTRADICTED", "No. The official record does not report the claimed landfall.", declaredSources),
+    responseFor("INSUFFICIENT", "There is not enough reliable information in the selected sources to verify this claim.", []),
   ];
   let requestBody;
   globalThis.fetch = async (_url, options) => {
@@ -154,7 +160,7 @@ test("evidence searches require a structured final answer and omit citations for
     claim: "Did a hurricane make landfall in the United States yesterday?",
     domains: ["nhc.noaa.gov"],
     sources: [{ name: "US National Hurricane Center", url: "https://www.nhc.noaa.gov/", domain: "nhc.noaa.gov", category: "Weather and emergencies" }],
-    isApprovedUrl: (url) => url === "https://www.nhc.noaa.gov/archive/",
+    isApprovedUrl: (url) => url.startsWith("https://www.nhc.noaa.gov/"),
     sourceLabelForUrl: () => "US National Hurricane Center",
   };
 
@@ -162,10 +168,15 @@ test("evidence searches require a structured final answer and omit citations for
     const contradicted = await checkClaimWithOpenAI(arguments_);
     assert.equal(requestBody.text.format.name, "claim_evidence_verdict");
     assert.equal(requestBody.text.format.strict, true);
-    assert.deepEqual(requestBody.text.format.schema.required, ["verdict", "answer"]);
+    assert.deepEqual(requestBody.text.format.schema.required, ["verdict", "answer", "sources"]);
     assert.equal(contradicted.verdict, "CONTRADICTED");
     assert.equal(contradicted.answer, "No. The official record does not report the claimed landfall.");
-    assert.deepEqual(contradicted.sources, [{ url: "https://www.nhc.noaa.gov/archive/", title: "NHC archive" }]);
+    assert.deepEqual(contradicted.sources, [{
+      url: "https://www.nhc.noaa.gov/archive/2026/al09/",
+      title: "AL092026 advisory archive",
+      summary: "The archive shows no advisory issued for the claimed landfall window.",
+      publishedAt: "2026-08-27",
+    }]);
 
     const insufficient = await checkClaimWithOpenAI(arguments_);
     assert.equal(insufficient.verdict, "INSUFFICIENT");
@@ -461,8 +472,8 @@ test("claim checks classify categories before a separate restricted evidence req
         verdict: "SUPPORTED",
         explanation: "Selected official sources confirm the relevant rule.",
         sources: [
-          { url: "https://data.gov/dataset/example", title: "Data.gov", excerpt: "This must not leave the server." },
-          { url: "https://cbu.uz/en/", title: "Central Bank of Uzbekistan", excerpt: "This unreviewed source must not leave the server." },
+          { url: "https://data.gov/dataset/example", title: "Data.gov open-data record", summary: "The dataset record describes how cash payments remain a permitted method under national payment rules.", publishedAt: "2026-06-15", excerpt: "This must not leave the server." },
+          { url: "https://cbu.uz/en/", title: "Central Bank of Uzbekistan", summary: "Unreviewed source; must not surface.", publishedAt: null, excerpt: "This unreviewed source must not leave the server." },
         ],
         checkedAt: "2026-07-27T00:00:00.000Z",
         model: "test-model",
@@ -488,7 +499,14 @@ test("claim checks classify categories before a separate restricted evidence req
     assert.ok(evidenceArguments.sources.every((source) => source.usageStatus !== "legacy-review-pending" && source.usagePolicyUrl));
     assert.equal(body.answer, "Selected official sources confirm the relevant rule.");
     assert.equal(body.explanation, "Selected official sources confirm the relevant rule.");
-    assert.deepEqual(body.sources, [{ url: "https://data.gov/dataset/example", title: "Data.gov" }]);
+    assert.deepEqual(body.sources, [{
+      url: "https://data.gov/dataset/example",
+      title: "Data.gov open-data record",
+      summary: "The dataset record describes how cash payments remain a permitted method under national payment rules.",
+      publishedAt: "2026-06-15",
+      category: "Government and law",
+      firstParty: true,
+    }]);
   } finally {
     await new Promise((resolve) => app.close(resolve));
     await pool.end();
