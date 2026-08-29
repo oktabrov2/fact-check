@@ -266,31 +266,48 @@ function renderHome() {
   app.innerHTML = `
     <section class="page hero">
       <div class="hero-copy reveal">
-        <span class="eyebrow">Evidence-led media and information literacy</span>
+        <span class="eyebrow">Evidence-led media literacy</span>
         <h1>Check the evidence. <em>Think before you share.</em></h1>
-        <p class="lead">Fact-Check turns uncertainty into an evidence trail. It first routes each question to the relevant trusted-source categories, then checks only those approved domains and links directly to what they support.</p>
+        <p class="lead">Fact-Check turns uncertainty into an evidence trail. It routes each question to the relevant trusted-source categories, then checks only those approved domains and links directly to what they support.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="/check" data-route>Check a claim <span aria-hidden="true">→</span></a>
           <a class="btn btn-secondary" href="/sources" data-route>Explore sources</a>
         </div>
-        <div class="trust-strip"><div class="trust-avatars" aria-hidden="true"><span>CBU</span><span>WHO</span><span>UN</span><span>NHC</span></div><span>Every result begins with a visible category boundary, never an open-web guess.</span></div>
-      </div>
-      <div class="hero-proof reveal" aria-label="A visual summary of the Fact-Check evidence process">
-        <div class="orbital"></div><div class="orbital orbital-two"></div>
-        <div class="evidence-core">
-          <div class="core-top"><span>EVIDENCE CHECK</span><span>TRACEABLE</span></div>
-          <div class="core-check" aria-hidden="true">✓</div>
-          <div><div class="core-title">Evidence first</div><div class="core-meta"><span>Source linked</span><span>Scope clear</span></div></div>
+        <div class="trust-strip">
+          <div class="trust-avatars" aria-hidden="true"><span>WHO</span><span>UN</span><span>NHC</span><span>CBU</span></div>
+          <span>Every result begins with a visible category boundary — never an open-web guess.</span>
         </div>
-        <div class="floating-proof proof-1"><span class="proof-icon" aria-hidden="true">↗</span><span><b>Selected sources</b><small>Only the public registry</small></span></div>
-        <div class="floating-proof proof-2"><span class="proof-icon" aria-hidden="true">✓</span><span><b>Clear outcome</b><small>Evidence, context, uncertainty</small></span></div>
       </div>
+      <aside class="hero-preview reveal" aria-label="Preview of a Fact-Check result card">
+        <div class="hero-preview-card">
+          <div class="hero-preview-head">
+            <span class="hero-preview-verdict">
+              <span aria-hidden="true"></span>Evidence supports the claim
+            </span>
+            <span class="hero-preview-meta">Checked just now</span>
+          </div>
+          <div class="hero-preview-trace">
+            <span class="hero-preview-trace-label">Evidence boundary</span>
+            <span class="hero-preview-trace-value">Weather and emergencies · Government and law</span>
+          </div>
+          <p class="hero-preview-answer">Yes. The National Hurricane Center's public advisory archive confirms a Category 2 landfall on the Gulf Coast on Aug 28.</p>
+          <a class="hero-preview-citation" href="#" data-route tabindex="-1">
+            <span class="hero-preview-citation-body">
+              <strong>US National Hurricane Center</strong>
+              <small>nhc.noaa.gov/archive/2026/al09/</small>
+            </span>
+            <span class="hero-preview-citation-tags">
+              <span class="hero-preview-citation-tag hero-preview-tag-first">First-party</span>
+              <span class="hero-preview-citation-tag hero-preview-tag-date">Aug 28</span>
+            </span>
+          </a>
+        </div>
+      </aside>
     </section>
 
     <section class="section section-tint"><div class="page">
       <div class="stat-grid reveal">
         <article class="stat-card"><strong data-source-count>110</strong><span>listed sources to inspect</span></article>
-        <article class="stat-card"><strong>0</strong><span>unlisted domains used in checks</span></article>
         <article class="stat-card"><strong>5</strong><span>careful evidence outcomes</span></article>
       </div>
     </div></section>
@@ -356,21 +373,85 @@ function renderVideo() {
 }
 
 function renderCheck() {
-  app.innerHTML = `${pageHead("Evidence workspace", "Verify a claim. <em>Trace the evidence.</em>", "Fact-Check first identifies the relevant source categories, then runs a separate evidence search only inside those approved domains. The final answer stays short and linked.")}
-    <section class="page checker-layout">
-      <form class="checker-card glass-card reveal" id="checker-form">
-        <span class="checker-kicker">Two-step verification</span>
-        <label class="form-label" for="claim">What would you like to verify?</label>
-        <span class="form-help">Use the original wording where possible. Add the place, date, or original caption so the source selection is more precise.</span>
-        <textarea id="claim" name="claim" maxlength="1800" placeholder="Example: Did a hurricane make landfall in the United States yesterday?"></textarea>
-        <div class="upload-row"><label class="upload-label">＋ Attach an image<input id="claim-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" /></label><span class="file-status" id="file-status">Optional · PNG, JPG, WEBP or GIF · up to 4 MB</span></div>
-        <button class="btn btn-primary" id="check-submit" type="submit">Verify with trusted sources <span aria-hidden="true">→</span></button>
-        <div class="example-row" aria-label="Example claims"><button class="example-btn" type="button" data-example="Did a hurricane make landfall in the United States yesterday?">Hurricane report</button><button class="example-btn" type="button" data-example="Has an official election result been announced for this area?">Election update</button><button class="example-btn" type="button" data-example="Is this health claim supported by official public-health sources?">Health claim</button></div>
-      </form>
-      <aside class="checker-side reveal"><article class="side-note glass-card"><span class="mini-label">01 · Route</span><h3>Choose the relevant evidence boundary.</h3><p>At first, selects relevant categories for your request.</p></article><article class="side-note glass-card"><span class="mini-label">02 · Check</span><h3>Search the chosen trusted domains.</h3><p>A new request checks only the sources in those categories, and only validated citations can appear in the result.</p></article><article class="side-note glass-card"><h3>What you receive</h3><ul><li>A concise evidence outcome.</li><li>Direct links to the sources used.</li><li>The source categories selected for your claim.</li></ul></article></aside>
+  app.innerHTML = `
+    <section class="page check-hero reveal">
+      <span class="eyebrow">Evidence workspace</span>
+      <h1>Verify a claim. <em>Trace the evidence.</em></h1>
+      <p class="lead">Ask about a hurricane report, a game release, an election result — the answer comes back with linked evidence, not just a summary.</p>
     </section>
+
+    <section class="page check-workspace">
+      <form class="checker-card checker-card-hero reveal" id="checker-form">
+        <div class="checker-toolbar">
+          <span class="checker-kicker">Two-step verification</span>
+          <div class="checker-registry-meta" aria-label="Trusted-source registry summary">
+            <span><b data-source-count>110</b> trusted sources</span>
+            <span aria-hidden="true" class="checker-registry-dot">·</span>
+            <span><b>14</b> categories</span>
+          </div>
+        </div>
+        <div class="claim-input-wrap">
+          <textarea id="claim" name="claim" maxlength="1800" aria-label="Claim to verify"></textarea>
+          <div class="claim-typewriter" id="claim-rotator" aria-hidden="true"><span class="claim-typewriter-slot" id="claim-rotator-slot"></span><span class="claim-typewriter-caret" aria-hidden="true"></span></div>
+          <span class="claim-counter" id="claim-counter" aria-hidden="true">0 / 1,800</span>
+        </div>
+        <div class="checker-footer">
+          <div class="checker-footer-left">
+            <label class="upload-label">＋ Attach an image<input id="claim-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" /></label>
+            <span class="file-status" id="file-status">Optional · PNG, JPG, WEBP or GIF · up to 4 MB</span>
+          </div>
+          <button class="btn btn-primary btn-large" id="check-submit" type="submit">Verify with trusted sources <span aria-hidden="true">→</span></button>
+        </div>
+      </form>
+    </section>
+
+    <section class="page check-flow">
+      <ol class="check-flow-grid">
+        <li class="check-flow-step glass-card reveal">
+          <span class="check-flow-num">01</span>
+          <h3>Route</h3>
+          <p>A first pass picks the smallest set of relevant trusted-source categories for your claim — no web search yet.</p>
+        </li>
+        <li class="check-flow-step glass-card reveal">
+          <span class="check-flow-num">02</span>
+          <h3>Check</h3>
+          <p>A separate search runs only inside those approved domains. Every citation is validated server-side before it can appear.</p>
+        </li>
+        <li class="check-flow-step glass-card reveal">
+          <span class="check-flow-num">03</span>
+          <h3>Result</h3>
+          <p>A concise verdict, the direct answer, and the exact article links, dates, and categories the evidence came from.</p>
+        </li>
+      </ol>
+    </section>
+
     <section class="page result-wrap" id="check-result" aria-live="polite"></section>`;
   bindChecker();
+  hydrateSourceCount();
+}
+
+function renderCitationCard(source) {
+  const title = escapeHtml(source.title || "Selected source");
+  const url = escapeAttr(source.url);
+  const displayUrl = escapeHtml(source.url);
+  const summary = String(source.summary || "").trim();
+  const publishedAt = source.publishedAt ? formatDate(source.publishedAt, { short: true }) : "";
+  const badges = [];
+  if (source.firstParty) badges.push(`<span class="citation-badge citation-badge-first">First-party official</span>`);
+  if (source.category) badges.push(`<span class="citation-badge citation-badge-category">${escapeHtml(source.category)}</span>`);
+  if (publishedAt) badges.push(`<span class="citation-badge citation-badge-date">Published ${escapeHtml(publishedAt)}</span>`);
+  return `
+    <a class="citation citation-detailed" href="${url}" target="_blank" rel="noreferrer">
+      <div class="citation-body">
+        <div class="citation-head">
+          <strong>${title}</strong>
+          <span class="citation-arrow" aria-hidden="true">↗</span>
+        </div>
+        <small class="citation-url">${displayUrl}</small>
+        ${summary ? `<p class="citation-summary">${escapeHtml(summary)}</p>` : ""}
+        ${badges.length ? `<div class="citation-badges">${badges.join("")}</div>` : ""}
+      </div>
+    </a>`;
 }
 
 function verdictLabel(verdict) {
@@ -383,8 +464,7 @@ function verdictHeading(verdict) {
 
 function renderCheckResult(result) {
   const verdict = String(result.verdict || "INSUFFICIENT").toLowerCase();
-  const citations = (result.sources || []).map((source) => `
-    <a class="citation" href="${escapeAttr(source.url)}" target="_blank" rel="noreferrer"><div><strong>${escapeHtml(source.title || "Selected source")}</strong><small>${escapeHtml(source.url)}</small></div><span class="citation-arrow" aria-hidden="true">↗</span></a>`).join("");
+  const citations = (result.sources || []).map(renderCitationCard).join("");
   const answer = result.answer || result.explanation || "There is not enough reliable information in the selected sources to verify this claim.";
   const hasEvidence = verdict !== "insufficient" && Boolean(citations);
   const selection = result.categorySelection || {};
@@ -400,12 +480,96 @@ function bindChecker() {
   const fileInput = document.querySelector("#claim-image");
   const fileStatus = document.querySelector("#file-status");
   const resultContainer = document.querySelector("#check-result");
+  const claimField = document.querySelector("#claim");
+  const rotator = document.querySelector("#claim-rotator");
+  const rotatorSlot = document.querySelector("#claim-rotator-slot");
+  const counter = document.querySelector("#claim-counter");
   let imageDataUrl = "";
 
-  document.querySelectorAll("[data-example]").forEach((button) => button.addEventListener("click", () => {
-    document.querySelector("#claim").value = button.dataset.example || "";
-    document.querySelector("#claim").focus();
-  }));
+  const rotatorExamples = [
+    "Did a hurricane make landfall in the United States yesterday?",
+    "Has GTA VI been officially released?",
+    "Has the national election result been officially announced?",
+    "Does the WHO recommend this treatment for adults?",
+    "Is cash still accepted for payments in Uzbekistan?",
+    "Did Rockstar Games post an official update on their Newswire this week?",
+    "Is there an active earthquake alert for this region right now?",
+    "Did this team officially win their national championship this year?",
+  ];
+  let rotatorIndex = 0;
+  let charIndex = 0;
+  let phase = "typing";
+  let rotatorTimer = null;
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+  const rotatorShouldShow = () => !claimField.value && document.activeElement !== claimField;
+
+  const applyRotatorVisibility = () => {
+    if (!rotator) return;
+    rotator.classList.toggle("hidden", !rotatorShouldShow());
+  };
+
+  const clearRotatorTimer = () => {
+    if (!rotatorTimer) return;
+    window.clearTimeout(rotatorTimer);
+    rotatorTimer = null;
+  };
+
+  const runTypewriter = () => {
+    rotatorTimer = null;
+    if (!rotatorSlot || !rotatorShouldShow()) return;
+    const target = rotatorExamples[rotatorIndex];
+    if (phase === "typing") {
+      charIndex = Math.min(charIndex + 1, target.length);
+      rotatorSlot.textContent = target.slice(0, charIndex);
+      if (charIndex >= target.length) {
+        phase = "holding";
+        rotatorTimer = window.setTimeout(runTypewriter, 2000);
+      } else {
+        rotatorTimer = window.setTimeout(runTypewriter, 42 + Math.random() * 38);
+      }
+    } else if (phase === "holding") {
+      phase = "deleting";
+      rotatorTimer = window.setTimeout(runTypewriter, 30);
+    } else if (phase === "deleting") {
+      charIndex = Math.max(charIndex - 1, 0);
+      rotatorSlot.textContent = target.slice(0, charIndex);
+      if (charIndex <= 0) {
+        rotatorIndex = (rotatorIndex + 1) % rotatorExamples.length;
+        phase = "typing";
+        rotatorTimer = window.setTimeout(runTypewriter, 320);
+      } else {
+        rotatorTimer = window.setTimeout(runTypewriter, 22 + Math.random() * 14);
+      }
+    }
+  };
+
+  const startRotator = () => {
+    if (!rotatorSlot || rotatorTimer) return;
+    if (prefersReducedMotion) {
+      rotatorSlot.textContent = rotatorExamples[rotatorIndex];
+      return;
+    }
+    runTypewriter();
+  };
+  const stopRotator = () => { clearRotatorTimer(); };
+
+  if (rotatorSlot) rotatorSlot.textContent = "";
+  applyRotatorVisibility();
+  startRotator();
+
+  const updateCounter = () => {
+    if (!counter) return;
+    const length = claimField.value.length;
+    counter.textContent = `${length.toLocaleString()} / 1,800`;
+    counter.classList.toggle("visible", length > 0);
+    counter.classList.toggle("near-limit", length > 1620);
+  };
+  updateCounter();
+
+  claimField.addEventListener("focus", () => { applyRotatorVisibility(); stopRotator(); });
+  claimField.addEventListener("blur", () => { applyRotatorVisibility(); if (rotatorShouldShow()) startRotator(); });
+  claimField.addEventListener("input", () => { applyRotatorVisibility(); updateCounter(); });
 
   fileInput.addEventListener("change", () => {
     const [file] = fileInput.files || [];
