@@ -953,8 +953,87 @@ function renderDocs() {
 }
 
 function renderContact() {
-  app.innerHTML = `${pageHead("Contact", "Let’s build more <em>informed habits.</em>", "Questions, source suggestions, project feedback, or collaboration ideas are welcome. Fact-Check grows stronger when its source policy is transparent and open to thoughtful challenge.")}
-    <section class="page contact-grid"><article class="contact-card glass-card reveal"><span class="eyebrow">Project contact</span><h2>Get in touch.</h2><p class="muted">For research collaboration, source-registry suggestions, or feedback on the project:</p><div class="contact-list"><a class="contact-link" href="mailto:oktabrovumrbek2023@gmail.com"><span aria-hidden="true">@</span><div><strong>Email</strong><small>oktabrovumrbek2023@gmail.com</small></div></a><a class="contact-link" href="https://oktabrov.sbs/" target="_blank" rel="noreferrer"><span aria-hidden="true">↗</span><div><strong>Portfolio</strong><small>oktabrov.sbs</small></div></a><a class="contact-link" href="https://www.linkedin.com/in/umrbek-oktyabrov-abaa56355" target="_blank" rel="noreferrer"><span aria-hidden="true">in</span><div><strong>LinkedIn</strong><small>Umrbek Oktyabrov</small></div></a></div></article><article class="contact-card glass-card reveal"><span class="eyebrow">Suggest a source</span><h3>What makes a good source suggestion?</h3><div class="principles"><article class="principle"><span>PRIMARY WHERE POSSIBLE</span><p>For a hurricane, an official weather agency is stronger evidence than a social-media summary.</p></article><article class="principle"><span>TRANSPARENT METHODS</span><p>Newsrooms and fact-checkers should publish corrections, methodology, ownership, and source links.</p></article><article class="principle"><span>DIVERSE &amp; RELEVANT</span><p>The registry should include local and multilingual sources that represent the people using the tool.</p></article></div><a class="btn btn-primary" href="mailto:oktabrovumrbek2023@gmail.com?subject=Fact-Check%20source%20suggestion">Suggest a source <span aria-hidden="true">→</span></a></article></section>`;
+  app.innerHTML = `${pageHead("Contact", "Let’s build more <em>informed habits.</em>", "Send a question, a source suggestion, project feedback, or a collaboration idea. Messages land in the project inbox.")}
+    <section class="page contact-grid">
+      <article class="contact-card glass-card reveal">
+        <span class="eyebrow">Send a message</span>
+        <h2>Get in touch.</h2>
+        <p class="muted">Please write in English or Uzbek. Include specific links or dates where relevant so the reply can be direct.</p>
+        <form class="contact-form" id="contact-form" novalidate>
+          <div class="contact-form-row">
+            <div>
+              <label class="form-label" for="contact-name">Your name</label>
+              <input id="contact-name" name="name" type="text" autocomplete="name" required minlength="2" maxlength="120" />
+            </div>
+            <div>
+              <label class="form-label" for="contact-email">Email address</label>
+              <input id="contact-email" name="email" type="email" autocomplete="email" required maxlength="254" />
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="contact-subject">Subject</label>
+            <input id="contact-subject" name="subject" type="text" required minlength="3" maxlength="200" placeholder="e.g. Source suggestion — Ministry of Health portal" />
+          </div>
+          <div>
+            <label class="form-label" for="contact-message">Message</label>
+            <textarea id="contact-message" name="message" required minlength="12" maxlength="4000" placeholder="What would you like to share?"></textarea>
+          </div>
+          <div class="contact-form-actions">
+            <button class="btn btn-primary" type="submit" id="contact-submit">Send message <span aria-hidden="true">→</span></button>
+            <span class="contact-form-hint">We store your message in the project database. No newsletter, no third-party sharing.</span>
+          </div>
+        </form>
+        <div class="contact-form-status" id="contact-status" role="status" aria-live="polite"></div>
+      </article>
+      <article class="contact-card glass-card reveal">
+        <span class="eyebrow">Suggest a source</span>
+        <h3>What makes a good source suggestion?</h3>
+        <div class="principles">
+          <article class="principle"><span>PRIMARY WHERE POSSIBLE</span><p>For a hurricane, an official weather agency is stronger evidence than a social-media summary.</p></article>
+          <article class="principle"><span>TRANSPARENT METHODS</span><p>Newsrooms and fact-checkers should publish corrections, methodology, ownership, and source links.</p></article>
+          <article class="principle"><span>DIVERSE &amp; RELEVANT</span><p>The registry should include local and multilingual sources that represent the people using the tool.</p></article>
+        </div>
+        <p class="muted contact-alt-note">Prefer LinkedIn? Reach the maintainer at <a class="text-action" href="https://www.linkedin.com/in/umrbek-oktyabrov-abaa56355" target="_blank" rel="noreferrer">Umrbek Oktyabrov ↗</a>.</p>
+      </article>
+    </section>`;
+  bindContactForm();
+}
+
+function bindContactForm() {
+  const form = document.querySelector("#contact-form");
+  const status = document.querySelector("#contact-status");
+  const button = document.querySelector("#contact-submit");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    status.className = "contact-form-status";
+    status.textContent = "";
+    if (!form.reportValidity()) return;
+    button.disabled = true;
+    button.innerHTML = `<span class="spinner"></span> Sending`;
+    try {
+      await api("/api/contact", {
+        method: "POST",
+        body: JSON.stringify({
+          name: document.querySelector("#contact-name").value,
+          email: document.querySelector("#contact-email").value,
+          subject: document.querySelector("#contact-subject").value,
+          message: document.querySelector("#contact-message").value,
+        }),
+      });
+      status.className = "contact-form-status is-success";
+      status.textContent = "Thanks — your message reached the project inbox. Replies come from oktabrovumrbek2023@gmail.com.";
+      form.reset();
+      toast("Message sent.", "success");
+    } catch (error) {
+      status.className = "contact-form-status is-error";
+      status.textContent = error.message;
+      toast(error.message, "error");
+    } finally {
+      button.disabled = false;
+      button.innerHTML = `Send message <span aria-hidden="true">→</span>`;
+    }
+  });
 }
 
 function renderPrivacy() {
@@ -1023,7 +1102,7 @@ function adminDashboardMarkupV2(status, snapshot) {
   const usageStatus = editing?.usageStatus === "reviewed-open-license"
     ? "reviewed-open-license"
     : "reviewed-link-and-citation";
-  return `<section class="page"><div class="admin-shell"><aside class="admin-sidebar glass-card"><strong>Source registry</strong><p>Categories determine which sources are eligible for each individual evidence search.</p><div class="admin-metric"><b>${activeCount}</b><span>active sources</span></div><div class="admin-metric"><b>${status.activeDomains}</b><span>registered domains</span></div><div class="admin-metric"><b>100</b><span>maximum domains per check</span></div><div class="admin-metric"><b>v${snapshot.version}</b><span>registry version</span></div><a class="btn btn-secondary btn-small" href="/api/sources.pdf">Download PDF</a></aside><section class="admin-panel glass-card"><div class="admin-panel-head"><div><span class="eyebrow">Administrator workspace</span><h2>Manage the source boundary</h2><p>Each new or edited source needs a high-confidence source assessment, manual ownership confirmation, and a recorded official terms or licence review.</p></div><button class="btn btn-secondary btn-small" id="admin-logout" type="button">Sign out</button></div><form class="admin-form" id="source-form"><input type="hidden" id="source-id" value="${escapeAttr(editing?.id || "")}" /><div><label class="form-label" for="source-name">Source name</label><input id="source-name" value="${escapeAttr(editing?.name || "")}" required maxlength="120" /></div><div><label class="form-label" for="source-url">Official first-party link</label><input id="source-url" type="url" value="${escapeAttr(editing?.url || "https://")}" required maxlength="2048" /><span class="form-help">HTTPS only. Social-platform domains cannot be admitted to automated checks.</span></div><div><label class="form-label" for="source-active">Search status</label><select id="source-active"><option value="true" ${editing?.active !== false ? "selected" : ""}>Active — eligible when its category is selected</option><option value="false" ${editing?.active === false ? "selected" : ""}>Paused — visible to administrators only</option></select></div><div class="source-analysis-card"><span class="mini-label">AI category assignment</span><strong id="source-category-result">${escapeHtml(categoryText)}</strong><span id="source-analysis-status">Analyze the source to receive a category and confidence check.</span><button class="text-action" id="assess-source" type="button">Analyze official source →</button></div><div class="full"><label class="form-label" for="source-rationale">Why does this domain belong in the registry?</label><textarea id="source-rationale" required maxlength="360" placeholder="State the official institution, authority, and evidence scope.">${escapeHtml(editing?.rationale || "")}</textarea></div><div><label class="form-label" for="source-usage-status">Source-use review</label><select id="source-usage-status"><option value="reviewed-link-and-citation" ${usageStatus === "reviewed-link-and-citation" ? "selected" : ""}>Reviewed for linking and citation only</option><option value="reviewed-open-license" ${usageStatus === "reviewed-open-license" ? "selected" : ""}>Published open reuse licence</option></select><span class="form-help">An open licence never includes logos, marks, or material the source excludes.</span></div><div><label class="form-label" for="source-usage-policy-url">Official terms or licence URL</label><input id="source-usage-policy-url" type="url" value="${escapeAttr(editing?.usagePolicyUrl || "https://")}" required maxlength="2048" /><span class="form-help">Use the source's own policy or licence page — not a third-party summary.</span></div><div class="full"><label class="form-label" for="source-usage-note">Usage-review note</label><textarea id="source-usage-note" required maxlength="420" placeholder="For example: Official licence permits reuse with attribution; logos, marks, and third-party material are excluded.">${escapeHtml(editing?.usageReviewNote || "")}</textarea></div><label class="source-review-check full"><input id="source-usage-review" type="checkbox" required /><span>I reviewed the official terms or licence above. Fact-Check will link to the original material and will not copy excluded content, logos, or branding.</span></label><label class="source-review-check full"><input id="source-manual-review" type="checkbox" required /><span>I manually confirmed the official ownership and scope of this domain. I understand that a low-confidence or uncertain assessment will not be admitted.</span></label><div class="full inline-actions"><button class="btn btn-primary" type="submit">${editing ? "Re-review and save source" : "Review and add source"} <span aria-hidden="true">→</span></button>${editing ? `<button class="btn btn-secondary" id="cancel-edit" type="button">Cancel edit</button>` : ""}</div></form><div class="admin-panel-head"><div><h3>Registry entries</h3><p>${snapshot.sources.length} entries · Updated ${formatDate(snapshot.updatedAt, { time: true })}</p></div><input id="admin-search" type="search" placeholder="Filter sources" aria-label="Filter all sources" /></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Source</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead><tbody id="admin-source-rows">${rows}</tbody></table></div></section></div></section>`;
+  return `<section class="page"><div class="admin-shell"><aside class="admin-sidebar glass-card"><strong>Source registry</strong><p>Categories determine which sources are eligible for each individual evidence search.</p><div class="admin-metric"><b>${activeCount}</b><span>active sources</span></div><div class="admin-metric"><b>${status.activeDomains}</b><span>registered domains</span></div><div class="admin-metric"><b>100</b><span>maximum domains per check</span></div><div class="admin-metric"><b>v${snapshot.version}</b><span>registry version</span></div><a class="btn btn-secondary btn-small" href="/api/sources.pdf">Download PDF</a></aside><section class="admin-panel glass-card"><div class="admin-panel-head"><div><span class="eyebrow">Administrator workspace</span><h2>Manage the source boundary</h2><p>Each new or edited source needs a high-confidence source assessment, manual ownership confirmation, and a recorded official terms or licence review.</p></div><button class="btn btn-secondary btn-small" id="admin-logout" type="button">Sign out</button></div><form class="admin-form" id="source-form"><input type="hidden" id="source-id" value="${escapeAttr(editing?.id || "")}" /><div><label class="form-label" for="source-name">Source name</label><input id="source-name" value="${escapeAttr(editing?.name || "")}" required maxlength="120" /></div><div><label class="form-label" for="source-url">Official first-party link</label><input id="source-url" type="url" value="${escapeAttr(editing?.url || "https://")}" required maxlength="2048" /><span class="form-help">HTTPS only. Social-platform domains cannot be admitted to automated checks.</span></div><div><label class="form-label" for="source-active">Search status</label><select id="source-active"><option value="true" ${editing?.active !== false ? "selected" : ""}>Active — eligible when its category is selected</option><option value="false" ${editing?.active === false ? "selected" : ""}>Paused — visible to administrators only</option></select></div><div class="source-analysis-card"><span class="mini-label">AI category assignment</span><strong id="source-category-result">${escapeHtml(categoryText)}</strong><span id="source-analysis-status">Analyze the source to receive a category and confidence check.</span><button class="text-action" id="assess-source" type="button">Analyze official source →</button></div><div class="full"><label class="form-label" for="source-rationale">Why does this domain belong in the registry?</label><textarea id="source-rationale" required maxlength="360" placeholder="State the official institution, authority, and evidence scope.">${escapeHtml(editing?.rationale || "")}</textarea></div><div><label class="form-label" for="source-usage-status">Source-use review</label><select id="source-usage-status"><option value="reviewed-link-and-citation" ${usageStatus === "reviewed-link-and-citation" ? "selected" : ""}>Reviewed for linking and citation only</option><option value="reviewed-open-license" ${usageStatus === "reviewed-open-license" ? "selected" : ""}>Published open reuse licence</option></select><span class="form-help">An open licence never includes logos, marks, or material the source excludes.</span></div><div><label class="form-label" for="source-usage-policy-url">Official terms or licence URL</label><input id="source-usage-policy-url" type="url" value="${escapeAttr(editing?.usagePolicyUrl || "https://")}" required maxlength="2048" /><span class="form-help">Use the source's own policy or licence page — not a third-party summary.</span></div><div class="full"><label class="form-label" for="source-usage-note">Usage-review note</label><textarea id="source-usage-note" required maxlength="420" placeholder="For example: Official licence permits reuse with attribution; logos, marks, and third-party material are excluded.">${escapeHtml(editing?.usageReviewNote || "")}</textarea></div><label class="source-review-check full"><input id="source-usage-review" type="checkbox" required /><span>I reviewed the official terms or licence above. Fact-Check will link to the original material and will not copy excluded content, logos, or branding.</span></label><label class="source-review-check full"><input id="source-manual-review" type="checkbox" required /><span>I manually confirmed the official ownership and scope of this domain. I understand that a low-confidence or uncertain assessment will not be admitted.</span></label><div class="full inline-actions"><button class="btn btn-primary" type="submit">${editing ? "Re-review and save source" : "Review and add source"} <span aria-hidden="true">→</span></button>${editing ? `<button class="btn btn-secondary" id="cancel-edit" type="button">Cancel edit</button>` : ""}</div></form><div class="admin-panel-head"><div><h3>Registry entries</h3><p>${snapshot.sources.length} entries · Updated ${formatDate(snapshot.updatedAt, { time: true })}</p></div><input id="admin-search" type="search" placeholder="Filter sources" aria-label="Filter all sources" /></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Source</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead><tbody id="admin-source-rows">${rows}</tbody></table></div><section class="admin-messages" aria-live="polite"><div class="admin-panel-head"><div><h3>Recent contact messages</h3><p id="admin-messages-summary">Loading messages…</p></div><button class="btn btn-secondary btn-small" id="admin-messages-refresh" type="button">Refresh</button></div><div class="admin-messages-list" id="admin-messages-list"><div class="center-loader"><span class="spinner"></span><span>Loading contact messages…</span></div></div></section></section></div></section>`;
 }
 
 function bindAdminDashboardV2(status, snapshot) {
@@ -1134,6 +1213,41 @@ function bindAdminDashboardV2(status, snapshot) {
     const term = event.target.value.trim().toLowerCase();
     document.querySelectorAll("#admin-source-rows tr").forEach((row) => { row.hidden = !row.textContent.toLowerCase().includes(term); });
   });
+
+  hydrateAdminMessages();
+  document.querySelector("#admin-messages-refresh")?.addEventListener("click", hydrateAdminMessages);
+}
+
+async function hydrateAdminMessages() {
+  const list = document.querySelector("#admin-messages-list");
+  const summary = document.querySelector("#admin-messages-summary");
+  if (!list || !summary) return;
+  list.innerHTML = `<div class="center-loader"><span class="spinner"></span><span>Loading contact messages…</span></div>`;
+  try {
+    const { messages } = await api("/api/admin/contact-messages");
+    if (!messages.length) {
+      summary.textContent = "No messages yet.";
+      list.innerHTML = `<div class="empty-state">Contact form submissions will appear here.</div>`;
+      return;
+    }
+    summary.textContent = `${messages.length} message${messages.length === 1 ? "" : "s"} in the inbox`;
+    list.innerHTML = messages.map((msg) => `
+      <article class="admin-message">
+        <div class="admin-message-head">
+          <div class="admin-message-identity">
+            <strong>${escapeHtml(msg.name)}</strong>
+            <a href="mailto:${escapeAttr(msg.email)}" class="admin-message-email">${escapeHtml(msg.email)}</a>
+          </div>
+          <span class="admin-message-time">${escapeHtml(formatDate(msg.createdAt, { time: true }))}</span>
+        </div>
+        <div class="admin-message-subject">${escapeHtml(msg.subject)}</div>
+        <p class="admin-message-body">${escapeHtml(msg.message)}</p>
+      </article>
+    `).join("");
+  } catch (error) {
+    summary.textContent = "Could not load messages.";
+    list.innerHTML = `<div class="warning">${escapeHtml(error.message)}</div>`;
+  }
 }
 
 function editingLabel(id) {
@@ -1291,7 +1405,7 @@ async function renderDonate() {
   const provider = escapeHtml(donation.provider);
   const paymentAction = donation.enabled && donation.url
     ? `<a class="btn btn-primary" href="${escapeAttr(donation.url)}" target="_blank" rel="noreferrer">Continue to ${provider} <span aria-hidden="true">↗</span></a>`
-    : `<a class="btn btn-primary" href="mailto:oktabrovumrbek2023@gmail.com?subject=Supporting%20Fact-Check">Contact us about supporting <span aria-hidden="true">→</span></a>`;
+    : `<a class="btn btn-primary" href="/contact" data-route>Contact us about supporting <span aria-hidden="true">→</span></a>`;
   const readiness = donation.enabled
     ? `A hosted ${provider} payment page is available. Fact-Check does not collect, process, or store payment-card details.`
     : `A live payment link has not been configured yet. Before accepting contributions, connect an approved provider and add its HTTPS payment link to the private server configuration.`;

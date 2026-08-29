@@ -523,13 +523,18 @@ textarea:focus, input:focus, select:focus { border-color: rgba(198,250,112,.58);
 .quote-card blockquote { margin: 0; font-size: clamp(1.3rem, 2.5vw, 2.05rem); line-height: 1.18; letter-spacing: -.04em; }
 .quote-card cite { display: block; margin-top: 18px; color: var(--muted); font-style: normal; font-size: .84rem; }
 
-.contact-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 18px; }
+.contact-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; }
 .contact-card { padding: 28px; }
-.contact-list { display: grid; gap: 13px; margin-top: 25px; }
-.contact-link { display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0,0,0,.12); transition: border .2s, transform .2s; }
-.contact-link:hover { border-color: rgba(101,217,238,.45); transform: translateX(2px); }
-.contact-link span:first-child { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: var(--night); background: var(--lime); font-weight: 800; }
-.contact-link small { display: block; color: var(--faint); }
+.contact-form { display: grid; gap: 14px; margin-top: 18px; }
+.contact-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.contact-form textarea { min-height: 140px; }
+.contact-form-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+.contact-form-hint { color: var(--faint); font-size: .78rem; }
+.contact-form-status { margin-top: 12px; padding: 12px 14px; border-radius: 12px; font-size: .84rem; line-height: 1.5; display: none; }
+.contact-form-status.is-success { display: block; color: var(--success); border: 1px solid rgba(128,233,179,.32); background: rgba(128,233,179,.08); }
+.contact-form-status.is-error { display: block; color: var(--danger); border: 1px solid rgba(255,133,133,.32); background: rgba(255,133,133,.08); }
+.contact-alt-note { margin: 18px 0 0; font-size: .84rem; }
+@media (max-width: 640px) { .contact-form-row { grid-template-columns: 1fr; } }
 
 .admin-shell { display: grid; grid-template-columns: 225px 1fr; gap: 18px; align-items: start; }
 .admin-sidebar { padding: 20px; position: sticky; top: 110px; }
@@ -560,6 +565,17 @@ textarea:focus, input:focus, select:focus { border-color: rgba(198,250,112,.58);
 .admin-table tr:last-child td { border-bottom: 0; }
 .admin-table td a { color: var(--cyan); }
 .admin-table .inactive { opacity: .48; }
+.admin-messages { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+.admin-messages .admin-panel-head { margin-bottom: 14px; }
+.admin-messages-list { display: grid; gap: 12px; }
+.admin-message { padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0,0,0,.15); }
+.admin-message-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.admin-message-identity { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.admin-message-identity strong { font-size: .9rem; color: var(--ink); }
+.admin-message-email { color: var(--cyan); font-size: .78rem; overflow-wrap: anywhere; }
+.admin-message-time { flex: none; color: var(--faint); font-size: .72rem; white-space: nowrap; }
+.admin-message-subject { margin-bottom: 6px; color: var(--lime); font-size: .85rem; font-weight: 700; }
+.admin-message-body { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin-terms-link { display: inline-block; margin-top: 5px; font-size: .74rem; font-weight: 700; }
 .admin-usage-status { display: block; margin-top: 7px; color: var(--lime); font-size: .7rem; font-weight: 700; }
 .admin-usage-status.is-pending { color: var(--faint); font-weight: 600; }

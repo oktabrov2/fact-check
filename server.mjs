@@ -6,6 +6,7 @@ import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { bootstrapEnvironmentAdministrator, createAuth, createUserAuth } from "./lib/auth.mjs";
 import { categoryForKey, categoryLabel, categorySummary, isBlockedPlatformDomain, SOURCE_CATEGORIES } from "./lib/categories.mjs";
+import { createContactStore } from "./lib/contact.mjs";
 import { assertDatabaseReady, createDatabasePool } from "./lib/db.mjs";
 import { PUBLIC_DIR, loadConfig } from "./lib/config.mjs";
 import { assessTrustedSourceWithOpenAI, checkClaimWithOpenAI, classifyClaimCategories } from "./lib/openai.mjs";
@@ -631,6 +632,7 @@ export function createApp(options = {}) {
   const ownsPool = !options.pool;
   const pool = options.pool || createDatabasePool(config);
   const sourceStore = options.sourceStore || createSourceStore(pool);
+  const contactStore = options.contactStore || createContactStore(pool);
   const adminAuth = options.auth || createAuth({
     pool,
     adminEmail: config.adminEmail || config.adminUsername,
@@ -647,6 +649,7 @@ export function createApp(options = {}) {
   const accountAttemptAllowed = createRateLimiter({ maxAttempts: 12, windowMs: 15 * 60 * 1000 });
   const adminAttemptAllowed = createRateLimiter({ maxAttempts: 8, windowMs: 15 * 60 * 1000 });
   const claimAttemptAllowed = createRateLimiter({ maxAttempts: 8, windowMs: 15 * 60 * 1000 });
+  const contactAttemptAllowed = createRateLimiter({ maxAttempts: 3, windowMs: 15 * 60 * 1000 });
 
   async function requireAdmin(request, response) {
     if (!(await adminAuth.isAuthenticated(request))) {
@@ -870,6 +873,26 @@ export function createApp(options = {}) {
         return sendJson(response, 200, publicDonationConfig(config));
       }
 
+      if (pathname === "/api/contact" && request.method === "POST") {
+        if (!contactAttemptAllowed(request)) return sendError(response, 429, "Too many contact-form submissions from this connection. Please wait a few minutes and try again.");
+        const body = await readJson(request, 64 * 1024);
+        const ip = request.socket?.remoteAddress || null;
+        try {
+          const record = await contactStore.submit({
+            name: body.name,
+            email: body.email,
+            subject: body.subject,
+            message: body.message,
+          }, { ip });
+          return sendJson(response, 201, { ok: true, id: record.id, submittedAt: record.createdAt });
+        } catch (error) {
+          if (/please (?:enter|add|write)/i.test(error?.message || "")) {
+            return sendError(response, 400, error.message);
+          }
+          throw error;
+        }
+      }
+
       if (pathname === "/api/check" && request.method === "POST") {
         const authenticatedUser = await userAuth.currentUser(request);
         const authenticatedAdministrator = authenticatedUser ? null : await adminAuth.currentUser(request);
@@ -986,6 +1009,12 @@ export function createApp(options = {}) {
       if (pathname === "/api/admin/logout" && request.method === "POST") {
         await adminAuth.logout(request);
         return sendJson(response, 200, { ok: true }, { "Set-Cookie": adminAuth.expiredCookie() });
+      }
+
+      if (pathname === "/api/admin/contact-messages" && request.method === "GET") {
+        if (!(await requireAdmin(request, response))) return;
+        const limit = Number(requestUrl.searchParams.get("limit")) || 100;
+        return sendJson(response, 200, { messages: await contactStore.list(limit) });
       }
 
       if (pathname === "/api/admin/sources") {
