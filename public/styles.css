@@ -625,6 +625,39 @@ textarea:focus, input:focus, select:focus { border-color: rgba(198,250,112,.58);
 .donation-next .callout { align-items: center; }
 .donation-next .text-action { margin-left: auto; }
 
+.docs-hero { max-width: 780px; padding: 62px 0 28px; }
+.docs-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.docs-version { padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(0,0,0,.2); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .7rem; font-weight: 700; letter-spacing: .04em; }
+.docs-hero h1 { font-size: clamp(2.2rem, 4.4vw, 3.4rem); margin-bottom: 14px; }
+.docs-hero .lead { max-width: 620px; }
+.docs-toc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
+.docs-toc a { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(0,0,0,.15); font-size: .78rem; font-weight: 600; transition: color .18s ease, border-color .18s ease, background .18s ease; }
+.docs-toc a:hover { color: var(--ink); border-color: rgba(198,250,112,.4); background: rgba(198,250,112,.05); }
+.docs-body { padding: 12px 0 96px; display: grid; gap: 48px; max-width: 780px; }
+.docs-section { scroll-margin-top: 120px; }
+.docs-section h2 { margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 1.55rem; font-weight: 700; }
+.docs-section h3 { margin: 22px 0 8px; color: var(--ink); font-size: 1rem; font-weight: 700; }
+.docs-section > p { color: var(--muted); line-height: 1.7; }
+.docs-section strong { color: var(--ink); font-weight: 700; }
+.docs-list { margin: 12px 0 0; padding-left: 20px; }
+.docs-list li { margin: 8px 0; color: var(--muted); line-height: 1.6; }
+.docs-list li strong { color: var(--ink); }
+.docs-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.docs-steps li { display: flex; gap: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: rgba(0,0,0,.15); }
+.docs-step-num { flex: none; width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(198,250,112,.32); border-radius: 12px; color: var(--lime); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .82rem; font-weight: 800; letter-spacing: .04em; }
+.docs-steps h3 { margin: 0 0 4px; }
+.docs-steps p { margin: 0; color: var(--muted); line-height: 1.6; }
+.docs-endpoint { margin: 14px 0 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: rgba(0,0,0,.15); }
+.docs-endpoint + .docs-endpoint { margin-top: 12px; }
+.docs-endpoint p { margin: 10px 0 0; color: var(--muted); line-height: 1.6; font-size: .89rem; }
+.docs-endpoint-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.docs-endpoint-head code { padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,.05); color: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88rem; font-weight: 600; }
+.docs-method { padding: 4px 8px; border-radius: 6px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .68rem; font-weight: 800; letter-spacing: .05em; }
+.docs-method-get { color: var(--cyan); background: rgba(101,217,238,.12); }
+.docs-method-post { color: var(--lime); background: rgba(198,250,112,.12); }
+.docs-code { margin: 12px 0 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: #04101a; color: #d0dbdf; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .82rem; line-height: 1.55; overflow-x: auto; white-space: pre; }
+.docs-note { color: var(--faint) !important; font-size: .82rem !important; }
+.docs-section code { padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,.05); color: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .84rem; }
 .warning, .info-banner { padding: 13px 15px; border: 1px solid rgba(255,199,120,.25); border-radius: 12px; color: #dbc69e; background: rgba(255,199,120,.06); font-size: .84rem; }
 .info-banner { border-color: rgba(101,217,238,.2); color: #add9e4; background: rgba(101,217,238,.05); }
 .spinner { width: 18px; height: 18px; display: inline-block; border: 2px solid rgba(7,18,31,.25); border-top-color: currentColor; border-radius: 50%; animation: spin .65s linear infinite; }
